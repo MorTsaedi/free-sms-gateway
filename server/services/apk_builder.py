@@ -34,12 +34,12 @@ async def build_apk(build_config_obj) -> str:
     env["PATH"] = f"{env['PATH']}:{env['ANDROID_SDK_ROOT']}/cmdline-tools/latest/bin:{env['ANDROID_SDK_ROOT']}/platform-tools"
     
     result = subprocess.run(
-        ["./gradlew", "assembleDebug"],
+        ["./gradlew", "assembleDebug", "--no-daemon", "--stacktrace"],
         cwd=ANDROID_DIR,
         env=env,
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=600,
     )
     
     if result.returncode != 0:
