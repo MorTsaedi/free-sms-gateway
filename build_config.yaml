@@ -1,0 +1,10 @@
+vm:
+  url: "http://localhost:8000"
+  api_key: "auto-generated-key"
+app:
+  package_name: "com.smsgateway"
+  app_name: "SMS Gateway"
+  poll_interval_seconds: 15
+  heartbeat_interval_seconds: 60
+build:
+  keystore: "debug"

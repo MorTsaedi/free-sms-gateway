@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h2 class="text-2xl font-bold text-gray-900">Dashboard</h2>
+    <p class="text-gray-600 mt-1">Overview of your SMS gateway</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Total Devices</h3>
+        <p class="text-3xl font-bold text-gray-900 mt-1" id="stat-devices-total">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Online</h3>
+        <p class="text-3xl font-bold text-green-600 mt-1" id="stat-devices-online">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Offline</h3>
+        <p class="text-3xl font-bold text-red-600 mt-1" id="stat-devices-offline">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Never Connected</h3>
+        <p class="text-3xl font-bold text-gray-400 mt-1" id="stat-devices-never">-</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Total SMS</h3>
+        <p class="text-3xl font-bold text-gray-900 mt-1" id="stat-sms-total">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Pending</h3>
+        <p class="text-3xl font-bold text-yellow-600 mt-1" id="stat-sms-pending">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Sent</h3>
+        <p class="text-3xl font-bold text-blue-600 mt-1" id="stat-sms-sent">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Delivered</h3>
+        <p class="text-3xl font-bold text-green-600 mt-1" id="stat-sms-delivered">-</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Failed</h3>
+        <p class="text-3xl font-bold text-red-600 mt-1" id="stat-sms-failed">-</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Recent Devices</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="devices-table">
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/v1/admin/stats', {
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            const data = await response.json();
+            
+            document.getElementById('stat-devices-total').textContent = data.devices.total;
+            document.getElementById('stat-devices-online').textContent = data.devices.online;
+            document.getElementById('stat-devices-offline').textContent = data.devices.offline;
+            document.getElementById('stat-devices-never').textContent = data.devices.never_connected;
+            
+            document.getElementById('stat-sms-total').textContent = data.sms.total;
+            document.getElementById('stat-sms-pending').textContent = data.sms.pending;
+            document.getElementById('stat-sms-sent').textContent = data.sms.sent;
+            document.getElementById('stat-sms-delivered').textContent = data.sms.delivered;
+            document.getElementById('stat-sms-failed').textContent = data.sms.failed;
+        } catch (e) {
+            console.error('Failed to load stats', e);
+        }
+    }
+
+    async function loadDevices() {
+        try {
+            const response = await fetch('/api/v1/admin/devices', {
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            const devices = await response.json();
+            
+            const tbody = document.getElementById('devices-table');
+            if (devices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No devices registered</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = devices.map(d => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${d.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${d.status === 'online' ? 'bg-green-100 text-green-800' : d.status === 'offline' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
+                            ${d.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(d.created_at).toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="deleteDevice(${d.id})" class="text-red-600 hover:text-red-900">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to load devices', e);
+        }
+    }
+
+    async function deleteDevice(id) {
+        if (!confirm('Delete this device?')) return;
+        
+        try {
+            const response = await fetch(`/api/v1/admin/devices/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            if (response.ok) {
+                loadDevices();
+                loadStats();
+            }
+        } catch (e) {
+            console.error('Failed to delete device', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!localStorage.getItem('admin_api_key')) {
+            const key = prompt('Enter your admin API key:');
+            if (key) localStorage.setItem('admin_api_key', key);
+        }
+        loadStats();
+        loadDevices();
+        setInterval(() => { loadStats(); loadDevices(); }, 30000);
+    });
+</script>
+{% endblock %}

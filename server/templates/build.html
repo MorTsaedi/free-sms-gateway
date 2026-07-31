@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Build APK - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h2 class="text-2xl font-bold text-gray-900">Build APK</h2>
+    <p class="text-gray-600 mt-1">Generate a custom APK with your configuration</p>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6 mb-8 max-w-2xl">
+    <form id="build-form" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">VM URL</label>
+            <input type="url" id="vm-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://your-domain.com" required>
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Device API Key</label>
+            <input type="text" id="api-key" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Device API key (from Devices page)" required>
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
+            <input type="text" id="package-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="com.smsgateway">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+            <input type="text" id="app-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="SMS Gateway">
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Poll Interval (seconds)</label>
+                <input type="number" id="poll-interval" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="15" min="5" max="300">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Heartbeat Interval (seconds)</label>
+                <input type="number" id="heartbeat-interval" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="60" min="30" max="3600">
+            </div>
+        </div>
+        
+        <button type="submit" id="build-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">Build APK</button>
+    </form>
+    
+    <div id="build-result" class="mt-4 hidden"></div>
+    
+    <div id="build-progress" class="mt-4 hidden">
+        <div class="bg-gray-100 rounded-full h-2">
+            <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+        </div>
+        <p class="text-sm text-gray-600 mt-2 text-center">Building APK... This may take a few minutes.</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Current Build Configuration</h3>
+    <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm" id="current-config">
+        Loading...
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadConfig() {
+        try {
+            const response = await fetch('/api/v1/apk/build-config', {
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            const config = await response.json();
+            
+            document.getElementById('vm-url').value = config.vm.url || '';
+            document.getElementById('api-key').value = config.vm.api_key || '';
+            document.getElementById('package-name').value = config.app.package_name || '';
+            document.getElementById('app-name').value = config.app.app_name || '';
+            document.getElementById('poll-interval').value = config.app.poll_interval_seconds || 15;
+            document.getElementById('heartbeat-interval').value = config.app.heartbeat_interval_seconds || 60;
+            
+            document.getElementById('current-config').textContent = JSON.stringify(config, null, 2);
+        } catch (e) {
+            console.error('Failed to load config', e);
+        }
+    }
+
+    document.getElementById('build-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = document.getElementById('build-btn');
+        const progress = document.getElementById('build-progress');
+        const result = document.getElementById('build-result');
+        
+        btn.disabled = true;
+        btn.classList.add('hidden');
+        progress.classList.remove('hidden');
+        result.classList.add('hidden');
+        
+        const payload = {
+            vm_url: document.getElementById('vm-url').value,
+            api_key: document.getElementById('api-key').value,
+            package_name: document.getElementById('package-name').value,
+            app_name: document.getElementById('app-name').value,
+            poll_interval_seconds: parseInt(document.getElementById('poll-interval').value),
+            heartbeat_interval_seconds: parseInt(document.getElementById('heartbeat-interval').value),
+        };
+        
+        try {
+            const response = await fetch('/api/v1/admin/apk/build', {
+                method: 'POST',
+                headers: { 
+                    'X-API-Key': localStorage.getItem('admin_api_key'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            progress.classList.add('hidden');
+            btn.disabled = false;
+            btn.classList.remove('hidden');
+            
+            if (response.ok) {
+                const data = await response.json();
+                result.className = 'mt-4 p-4 rounded-lg bg-green-50 text-green-800';
+                result.innerHTML = `
+                    <strong>APK built successfully!</strong><br>
+                    <a href="${data.download_url}" class="text-blue-600 underline mt-2 block" target="_blank">Download APK</a>
+                    <p class="text-sm text-gray-600 mt-2">Link expires in 1 hour. Share this URL with the device owner.</p>
+                `;
+                result.classList.remove('hidden');
+                loadConfig();
+            } else {
+                const err = await response.json();
+                result.className = 'mt-4 p-4 rounded-lg bg-red-50 text-red-800';
+                result.textContent = 'Error: ' + err.detail;
+                result.classList.remove('hidden');
+            }
+        } catch (e) {
+            progress.classList.add('hidden');
+            btn.disabled = false;
+            btn.classList.remove('hidden');
+            result.className = 'mt-4 p-4 rounded-lg bg-red-50 text-red-800';
+            result.textContent = 'Error: ' + e.message;
+            result.classList.remove('hidden');
+            console.error('Build failed', e);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!localStorage.getItem('admin_api_key')) {
+            const key = prompt('Enter your admin API key:');
+            if (key) localStorage.setItem('admin_api_key', key);
+        }
+        loadConfig();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Devices - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex justify-between items-center">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900">Devices</h2>
+        <p class="text-gray-600 mt-1">Manage registered devices</p>
+    </div>
+    <button onclick="openCreateModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+        Add Device
+    </button>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200" id="devices-table">
+            <tr>
+                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div id="create-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Create Device</h3>
+        </div>
+        <div class="px-6 py-4">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
+                <input type="text" id="device-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. My Phone">
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button onclick="closeCreateModal()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
+            <button onclick="createDevice()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadDevices() {
+        try {
+            const response = await fetch('/api/v1/admin/devices', {
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            const devices = await response.json();
+            
+            const tbody = document.getElementById('devices-table');
+            if (devices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No devices registered. Click "Add Device" to create one.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = devices.map(d => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${d.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${d.status === 'online' ? 'bg-green-100 text-green-800' : d.status === 'offline' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
+                            ${d.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(d.created_at).toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="deleteDevice(${d.id})" class="text-red-600 hover:text-red-900 mr-3">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to load devices', e);
+        }
+    }
+
+    async function createDevice() {
+        const name = document.getElementById('device-name').value.trim();
+        if (!name) return alert('Please enter a device name');
+        
+        try {
+            const response = await fetch('/api/v1/admin/devices', {
+                method: 'POST',
+                headers: { 
+                    'X-API-Key': localStorage.getItem('admin_api_key'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Device created! API Key: ${data.api_key}\n\nSave this key - it won't be shown again.`);
+                closeCreateModal();
+                loadDevices();
+            } else {
+                const err = await response.json();
+                alert('Error: ' + err.detail);
+            }
+        } catch (e) {
+            console.error('Failed to create device', e);
+            alert('Failed to create device');
+        }
+    }
+
+    async function deleteDevice(id) {
+        if (!confirm('Delete this device? This cannot be undone.')) return;
+        
+        try {
+            const response = await fetch(`/api/v1/admin/devices/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
+            });
+            if (response.ok) {
+                loadDevices();
+            }
+        } catch (e) {
+            console.error('Failed to delete device', e);
+        }
+    }
+
+    function openCreateModal() {
+        document.getElementById('device-name').value = '';
+        document.getElementById('create-modal').classList.remove('hidden');
+        document.getElementById('create-modal').classList.add('flex');
+    }
+
+    function closeCreateModal() {
+        document.getElementById('create-modal').classList.add('hidden');
+        document.getElementById('create-modal').classList.remove('flex');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!localStorage.getItem('admin_api_key')) {
+            const key = prompt('Enter your admin API key:');
+            if (key) localStorage.setItem('admin_api_key', key);
+        }
+        loadDevices();
+    });
+</script>
+{% endblock %}

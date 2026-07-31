@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SMS Gateway{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-900">SMS Gateway</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/admin" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                    <a href="/admin/devices" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Devices</a>
+                    <a href="/admin/send" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Send SMS</a>
+                    <a href="/admin/build" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Build APK</a>
+                    <a href="/admin/logs" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Logs</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <p class="text-center text-gray-500 text-sm">SMS Gateway - Self-hosted SMS Gateway</p>
+        </div>
+    </footer>
+</body>
+</html>
