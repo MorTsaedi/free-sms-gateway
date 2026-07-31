@@ -339,7 +339,14 @@ cd android
 - Check certificate status: `docker compose run certbot certificates`
 - For local testing, temporarily comment out the SSL redirect in `nginx.conf`
 
-### API key authentication
+### Container Resource Usage
+
+The Docker image includes the JDK + Android SDK for on-demand APK builds. At idle, the container uses only ~50–100MB RAM (just the Python FastAPI process). The build tools consume **no RAM** until an APK build is triggered — they run as a short-lived subprocess within the same container.
+
+**Disk overhead**: ~2GB for the JDK + Android SDK in the image. If you're on a disk-constrained VPS and don't need on-demand APK builds, you can:
+1. Build the APK once on another machine with the Android SDK
+2. Place the APK in `./static/downloads/`
+3. Create a download token via the API: `POST /api/v1/admin/apk/build` (with the pre-built APK path)
 - Admin keys go in the `api_keys` table (created via POST `/api/v1/admin/api-keys`)
 - Device keys are generated when you create a device and shown once
 - The initial admin key must be bootstrapped manually — seed it into the database:
