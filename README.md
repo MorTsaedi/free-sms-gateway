@@ -1,6 +1,42 @@
 # Free SMS Gateway
 
-Self-hosted SMS gateway with VM server (Python/FastAPI) + Android app (APK auto-built on VM). Phone polls VM for outbound SMS via HTTP. No Firebase, no paid services. Only cost = SMS charges on mobile plan.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.12-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/fastapi-0.111-009485?logo=fastapi&logoColor=white)
+![Kotlin](https://img.shields.io/badge/kotlin-1.9-7F52B5?logo=kotlin&logoColor=white)
+![Android](https://img.shields.io/badge/android-34-3DDC84?logo=android&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-ready-2496ed?logo=docker&logoColor=white)
+![Platform](https://img.shields.io/badge/platform-self--hosted-orange)
+![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen)
+
+> **Never pay Twilio, Plivo, or any SMS API again.** Run your own SMS gateway on a $5/month VPS and pay only for the SMS charges on your existing mobile plan.
+
+---
+
+## Why I Made This
+
+After years of paying **$20–$50/month** for Twilio and other SMS-as-a-Service providers, I realized I was being charged a massive markup for a service that essentially just forwards HTTP → SMS on a phone that's already sitting in my pocket.
+
+The math is simple:
+
+| Solution | Cost |
+|----------|------|
+| Twilio SMS ($0.0075/SMS) | ~$0.0075 per message |
+| AWS SNS | ~$0.005 per message |
+| **This project (self-hosted)** | **$0.00** (just your mobile plan) |
+
+The only real cost is the SMS charge from your carrier — which you're already paying for. The app runs on your Android phone, polls your server for messages, and sends them via `SmsManager`. No Firebase, no cloud provider fees, no subscription traps.
+
+Perfect for:
+- **Personal notifications** — Get alerts from your servers, apps, and services
+- **Business notifications** — Send order confirmations, appointment reminders, alerts
+- **Two-factor delivery** — Reliable SMS delivery without third-party providers
+- **International SMS** — Use local SIM cards to send SMS globally at local rates
+- **Privacy-focused** — Your SMS content never touches a third-party server
+
+This is the tool I always wished existed. Now it does.
+
+---
 
 ## Architecture
 
@@ -18,91 +54,220 @@ Self-hosted SMS gateway with VM server (Python/FastAPI) + Android app (APK auto-
 └─────────────┘                       └─────────────┘
 ```
 
+### How It Works
+
+1. **Admin** creates a device in the admin UI → API key is generated
+2. **Admin** triggers an APK build with that API key → APK is compiled on the VM
+3. **User** installs the APK on their phone → app registers with VM using its key
+4. **Admin** queues SMS via admin UI → message sits in SQLite queue
+5. **Phone** polls VM every 15s (configurable) → receives pending SMS → sends via `SmsManager` → reports result
+6. **Admin** sees delivery status in the logs
+
+### Key Design Decisions
+
+| Decision | Reason |
+|----------|--------|
+| **HTTP polling** (not push/Firebase) | No Google dependencies; works through NAT/firewalls; simplest architecture |
+| **VM builds APK** | App gets correct config baked in; user doesn't need to enter sensitive keys manually |
+| **APK is debug-signed** | No Play Store required; direct install; no build complexity |
+| **Foreground service** | Android 13+ requires foreground service for background SMS sending |
+| **WorkManager backup** | If foreground service is killed, WorkManager still retries polling |
+| **SQLite on VM** | No external DB required; everything containerized with Docker Compose |
+| **bCrypt hashed API keys** | Keys never stored in plaintext; compromised DB won't leak usable keys |
+
+---
+
 ## Features
 
-- **VM Server**: FastAPI with SQLite database
-- **Android App**: Kotlin app with foreground service for background polling
-- **Admin UI**: Minimal HTMX + Tailwind dashboard
-- **APK Builder**: Builds custom APKs with embedded configuration
-- **Docker Deployment**: Single `docker compose up` command
-- **No External Dependencies**: No Firebase, no paid services
+- **VM Server (FastAPI)**
+  - Device registration with auto-generated API keys
+  - HTTP polling endpoint for SMS delivery
+  - SMS queue with status tracking (pending → sent → delivered/failed)
+  - Admin API + web UI (HTMX + Tailwind, no JS framework needed)
+  - On-demand APK building with config injection
+  - One-time download tokens (1-hour expiry) for APK downloads
+  - Rate limiting on SMS send endpoint
+  - Structured JSON logging
+
+- **Android App (Kotlin)**
+  - Foreground service for persistent background operation
+  - WorkManager fallback for periodic polling
+  - Sends SMS via `SmsManager` (native Android API)
+  - Boot receiver — auto-starts after device reboot
+  - Battery and signal strength reporting
+  - Config stored securely (device API key baked in at build time)
+
+- **Admin UI**
+  - Device management (register, view status, delete)
+  - SMS queue with filtering and pagination
+  - One-click APK builder with live config preview
+  - Activity logs with real-time stats
+  - Responsive design — works on mobile too
+
+- **Deployment**
+  - Single `docker compose up` command
+  - Automatic HTTPS with Let's Encrypt (certbot)
+  - Nginx reverse proxy with static file serving
+  - Health checks for container orchestration
+
+---
 
 ## Quick Start
 
 ### 1. Clone and Configure
 
 ```bash
-git clone <repo>
-cd sms-gateway
-
-# Copy example env and edit
+git clone https://github.com/MorTsaedi/free-sms-gateway.git
+cd free-sms-gateway
 cp .env.example .env
-# Edit .env with your values
+# Edit .env — set API_KEY, SECRET_KEY, VM_PUBLIC_URL
 ```
 
-### 2. Start with Docker Compose
+### 2. Deploy
 
 ```bash
 docker compose up -d
 ```
 
-This starts:
-- FastAPI server on port 8000
-- Nginx reverse proxy on ports 80/443
-- Automatic HTTPS with Let's Encrypt (certbot)
+Navigate to `https://your-domain.com/admin` in your browser.
 
-### 3. Access Admin UI
+### 3. Create a Device
 
-Open `https://your-domain.com/admin` in browser.
+1. Go to **Devices** → **Add Device**
+2. Enter a name (e.g., "My Phone")
+3. Copy the generated device API key — you'll need it next
 
-First time: Enter your admin API key (from `.env` `API_KEY`).
-
-### 4. Create a Device
-
-1. Go to **Devices** page
-2. Click **Add Device**
-3. Enter a name (e.g., "My Phone")
-4. **Save the API key shown** - you'll need it for the APK
-
-### 5. Build APK
+### 4. Build & Install APK
 
 1. Go to **Build APK** page
-2. Fill in:
-   - **VM URL**: Your public URL (e.g., `https://sms.example.com`)
-   - **Device API Key**: The key from step 4
-3. Click **Build APK**
-4. Download the APK when ready (link expires in 1 hour)
+2. Paste your VM URL and device API key
+3. Click **Build APK** → wait ~2 minutes
+4. Click the download link → install on Android
+5. Grant SMS permissions when prompted
 
-### 6. Install on Android
+### 5. Send SMS
 
-1. Transfer APK to phone (download link, USB, etc.)
-2. Install (allow "Unknown sources" if prompted)
-3. Open app, grant SMS permission
-4. App will show "Configured ✓" and start polling
+1. Go to **Send SMS** page
+2. Select device, enter phone number + message
+3. Phone receives it on next poll (within 15s)
 
-### 7. Send SMS
+---
 
-1. Go to **Send SMS** page in admin UI
-2. Select device, enter phone number and message
-3. Click **Send SMS**
-4. Phone will pick it up on next poll (within 15s default)
+## Project Structure
+
+```
+free-sms-gateway/
+├── docker-compose.yml          # Multi-service deployment
+├── Dockerfile                  # Python + Android SDK image
+├── requirements.txt
+├── build_config.yaml           # APK build configuration
+├── nginx.conf                  # Reverse proxy + SSL
+├── .env.example                # Environment template
+├── server/                     # FastAPI backend
+│   ├── main.py                 # App entry point
+│   ├── config.py               # Settings + build config
+│   ├── database.py             # SQLAlchemy models
+│   ├── auth.py                 # API key auth (bcrypt)
+│   ├── routes/
+│   │   ├── device.py           # Device endpoints
+│   │   ├── sms.py              # SMS queue endpoints
+│   │   ├── admin.py            # Admin UI (HTML pages)
+│   │   ├── admin_api.py        # Admin API endpoints
+│   │   └── apk.py              # APK download
+│   ├── services/
+│   │   ├── apk_builder.py      # Gradle build wrapper
+│   │   └── sms_queue.py        # Queue management + stats
+│   └── templates/              # Jinja2 + HTMX templates
+├── android/                    # Android app source
+│   ├── app/
+│   │   ├── src/main/
+│   │   │   ├── AndroidManifest.xml
+│   │   │   ├── java/com/smsgateway/
+│   │   │   │   ├── MainActivity.kt
+│   │   │   │   ├── SmsService.kt
+│   │   │   │   ├── PollingWorker.kt
+│   │   │   │   ├── ApiClient.kt
+│   │   │   │   ├── BootReceiver.kt
+│   │   │   │   └── SmsGatewayApplication.kt
+│   │   │   └── res/
+│   │   └── build.gradle.kts
+│   ├── build.gradle.kts
+│   ├── settings.gradle.kts
+│   └── gradle.properties
+└── README.md
+```
+
+---
+
+## API Reference
+
+### Device Endpoints (Device API Key)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/device/register` | Register a new device |
+| `GET` | `/api/v1/device/poll` | Poll for pending SMS |
+| `POST` | `/api/v1/device/heartbeat` | Update device status |
+| `POST` | `/api/v1/device/sms/{id}/result` | Report SMS send result |
+
+### SMS Endpoints (Admin API Key)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/sms/send` | Queue an SMS |
+| `GET` | `/api/v1/sms/queue` | List SMS queue (with filtering) |
+| `POST` | `/api/v1/sms/retry/{id}` | Retry a failed SMS |
+| `DELETE` | `/api/v1/sms/{id}` | Delete from queue |
+
+### Admin API Endpoints (Admin API Key)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/admin/devices` | List devices |
+| `POST` | `/api/v1/admin/devices` | Create device |
+| `DELETE` | `/api/v1/admin/devices/{id}` | Delete device |
+| `GET` | `/api/v1/admin/api-keys` | List admin API keys |
+| `POST` | `/api/v1/admin/api-keys` | Create admin API key |
+| `GET` | `/api/v1/admin/stats` | Get statistics |
+| `POST` | `/api/v1/admin/test-sms` | Send test SMS |
+| `POST` | `/api/v1/admin/apk/build` | Build APK |
+
+### Admin UI Pages
+
+| Route | Description |
+|-------|-------------|
+| `/admin` | Dashboard with device status + stats |
+| `/admin/devices` | Device management |
+| `/admin/send` | SMS queue form |
+| `/admin/build` | APK builder |
+| `/admin/logs` | SMS activity logs |
+
+### Public
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/api/v1/apk/download/{token}` | Download APK (one-time token) |
+
+---
 
 ## Configuration
 
 ### Environment Variables (`.env`)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `API_KEY` | Admin API key for UI access | Required |
-| `SECRET_KEY` | Session secret | Required |
-| `VM_PUBLIC_URL` | Public URL for APK downloads | `http://localhost` |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `API_KEY` | Admin API key for backend access | Yes |
+| `SECRET_KEY` | Random secret for sessions | Yes |
+| `VM_PUBLIC_URL` | Public URL for APK download links | Yes |
+| `DATABASE_URL` | SQLite path (usually default) | No |
 
 ### Build Config (`build_config.yaml`)
 
 ```yaml
 vm:
   url: "https://your-domain.com"
-  api_key: "auto-generated-key"
+  api_key: "device-api-key"
 app:
   package_name: "com.smsgateway"
   app_name: "SMS Gateway"
@@ -112,111 +277,86 @@ build:
   keystore: "debug"
 ```
 
-## API Endpoints
-
-### Device Endpoints (Device API Key)
-- `GET /api/v1/device/poll` - Poll for pending SMS
-- `POST /api/v1/device/register` - Register device
-- `POST /api/v1/device/heartbeat` - Update device status
-- `POST /api/v1/device/sms/{id}/result` - Report SMS result
-
-### SMS Endpoints (Admin API Key)
-- `POST /api/v1/sms/send` - Queue SMS
-- `GET /api/v1/sms/queue` - List SMS queue
-- `POST /api/v1/sms/retry/{id}` - Retry failed SMS
-- `DELETE /api/v1/sms/{id}` - Delete from queue
-
-### Admin Endpoints (Admin API Key)
-- `GET /api/v1/admin/devices` - List devices
-- `POST /api/v1/admin/devices` - Create device
-- `DELETE /api/v1/admin/devices/{id}` - Delete device
-- `GET /api/v1/admin/api-keys` - List admin API keys
-- `POST /api/v1/admin/api-keys` - Create admin API key
-- `GET /api/v1/admin/stats` - Get statistics
-- `POST /api/v1/admin/test-sms` - Send test SMS
-- `POST /api/v1/admin/apk/build` - Build APK
-- `GET /api/v1/apk/build-config` - Get build config
-- `GET /api/v1/apk/download/{token}` - Download APK
-
-### Public
-- `GET /health` - Health check
+---
 
 ## Security
 
-- API keys: 32-char random, stored as bcrypt hash
-- HTTPS via Nginx + Let's Encrypt
-- Rate limiting on `/sms/send` (10/min per device)
-- Only outbound SMS - no reading of messages
-- APK is debug-signed (user accepts "unknown source" warning)
+- **API keys**: 32-char random tokens, stored as bcrypt hashes
+- **HTTPS**: Nginx + Let's Encrypt automatic SSL
+- **APK downloads**: One-time tokens that expire after 1 hour
+- **No SMS reading**: Only outbound sending via `SmsManager`
+- **Rate limiting**: 10 SMS/min per device on the send endpoint
+- **APK is debug-signed**: User installs via "Unknown Sources" — no Play Store needed
+
+---
 
 ## Development
+
+### Prerequisites
+
+- Python 3.12+
+- Android SDK (for APK builds)
+- Java 17
 
 ### Local Development
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Run server
 uvicorn server.main:app --reload
-
-# Run Android build (requires Android SDK)
-cd android && ./gradlew assembleDebug
 ```
 
-### Project Structure
+### Building APK Locally
 
+```bash
+cd android
+./gradlew assembleDebug
 ```
-sms-gateway/
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── build_config.yaml
-├── nginx.conf
-├── server/
-│   ├── main.py
-│   ├── config.py
-│   ├── database.py
-│   ├── auth.py
-│   ├── routes/
-│   │   ├── device.py
-│   │   ├── sms.py
-│   │   ├── admin.py
-│   │   └── apk.py
-│   ├── services/
-│   │   ├── apk_builder.py
-│   │   └── sms_queue.py
-│   └── templates/
-├── android/
-│   ├── app/
-│   │   ├── src/main/
-│   │   │   ├── AndroidManifest.xml
-│   │   │   ├── java/com/smsgateway/
-│   │   │   └── res/
-│   │   └── build.gradle.kts
-│   ├── build.gradle.kts
-│   └── settings.gradle.kts
-└── README.md
-```
+
+### Project Conventions
+
+- Python backend uses **FastAPI** async with SQLAlchemy 2.0
+- API auth uses **API key headers** (`X-API-Key` for admin, `X-Device-API-Key` for devices)
+- Android app uses **Kotlin** with **WorkManager** + **Foreground Service**
+- Admin UI uses **Jinja2** + **HTMX** (no React/Vue/Angular)
+
+---
 
 ## Troubleshooting
 
-### APK Build Fails
-- Check Docker logs: `docker compose logs app`
-- Ensure Android SDK is properly installed in Dockerfile
-- Try building locally: `cd android && ./gradlew assembleDebug`
+### APK build fails in Docker
+- Check logs: `docker compose logs app`
+- The Android SDK install can take 5+ minutes on first run
+- Ensure your machine has enough disk space (Android SDK + Gradle cache ~2GB)
 
-### Phone Not Receiving SMS
-- Check device status in admin UI (should be "online")
-- Verify SMS permission granted on phone
-- Check phone logs in app (Logs section)
-- Ensure VM URL is accessible from phone (not localhost)
+### Phone not receiving SMS
+- Check device status in admin UI — should show "online"
+- Verify SMS permission is granted on the Android app
+- Check that the VM URL is accessible from your phone (not `localhost`)
+- Review logs in the app — they show connection status and errors
 
-### Nginx SSL Issues
-- For local testing, use HTTP (edit nginx.conf to remove SSL redirect)
-- For production, ensure domain points to server IP
-- Check certbot logs: `docker compose logs certbot`
+### Nginx SSL issues
+- First-time Let's Encrypt setup takes a few minutes
+- Check certificate status: `docker compose run certbot certificates`
+- For local testing, temporarily comment out the SSL redirect in `nginx.conf`
+
+### API key authentication
+- Admin keys go in the `api_keys` table (created via POST `/api/v1/admin/api-keys`)
+- Device keys are generated when you create a device and shown once
+- The initial admin key must be bootstrapped manually — seed it into the database:
+  ```sql
+  INSERT INTO api_keys (key_hash, name, created_at) VALUES ('<bcrypt-hash-of-your-key>', 'default', NOW());
+  ```
+
+---
 
 ## License
 
-MIT License - Feel free to use and modify.
+MIT License — Feel free to fork, modify, and use this for any purpose, personal or commercial.
+
+---
+
+## Acknowledgments
+
+- The Android SMS sending approach is inspired by various open-source SMS gateway projects
+- The FastAPI patterns are based on modern async Python best practices
+- The HTMX admin UI is intentionally minimal — it's a tool, not a showcase
