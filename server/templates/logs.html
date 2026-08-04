@@ -67,9 +67,15 @@
             const response = await fetch(url, {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
-            const data = await response.json();
-            
             const tbody = document.getElementById('logs-table');
+
+            if (!response.ok) {
+                if (response.status === 401) localStorage.removeItem('admin_api_key');
+                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load logs (${response.status}) - reload to re-enter admin key if unauthorized</td></tr>`;
+                return;
+            }
+
+            const data = await response.json();
             if (data.items.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">No SMS logs found</td></tr>';
             } else {
@@ -113,8 +119,9 @@
             const response = await fetch('/api/v1/admin/devices', {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
+            if (!response.ok) { if (response.status === 401) localStorage.removeItem('admin_api_key'); return; }
             const devices = await response.json();
-            
+
             const select = document.getElementById('device-filter');
             const currentValue = select.value;
             select.innerHTML = '<option value="">All Devices</option>' + devices

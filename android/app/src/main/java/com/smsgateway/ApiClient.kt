@@ -4,6 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.lang.reflect.Type
 import java.util.concurrent.TimeUnit
@@ -50,7 +53,7 @@ class ApiClient(private val context: Context) {
         .add("Content-Type", "application/json")
         .build()
 
-    suspend fun poll(): PollResponse {
+    suspend fun poll(): PollResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$baseUrl/api/v1/device/poll")
             .headers(authHeaders())
@@ -62,13 +65,13 @@ class ApiClient(private val context: Context) {
                 throw IOException("Poll failed: ${response.code}")
             }
             val body = response.body?.string() ?: throw IOException("Empty response")
-            return gson.fromJson(body, PollResponse::class.java)
+            gson.fromJson(body, PollResponse::class.java)
         }
     }
 
-    suspend fun heartbeat(request: HeartbeatRequest) {
+    suspend fun heartbeat(request: HeartbeatRequest) = withContext(Dispatchers.IO) {
         val json = gson.toJson(request)
-        val requestBody = RequestBody.create(json, MediaType.get("application/json"))
+        val requestBody = RequestBody.create("application/json".toMediaType(), json)
 
         val request = Request.Builder()
             .url("$baseUrl/api/v1/device/heartbeat")
@@ -83,10 +86,10 @@ class ApiClient(private val context: Context) {
         }
     }
 
-    suspend fun sendSmsResult(smsId: Int, success: Boolean, error: String? = null) {
+    suspend fun sendSmsResult(smsId: Int, success: Boolean, error: String? = null) = withContext(Dispatchers.IO) {
         val request = SmsResultRequest(success, error)
         val json = gson.toJson(request)
-        val requestBody = RequestBody.create(json, MediaType.get("application/json"))
+        val requestBody = RequestBody.create("application/json".toMediaType(), json)
 
         val httpRequest = Request.Builder()
             .url("$baseUrl/api/v1/device/sms/$smsId/result")

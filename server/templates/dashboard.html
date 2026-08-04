@@ -82,8 +82,12 @@
             const response = await fetch('/api/v1/admin/stats', {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
+            if (!response.ok) {
+                if (response.status === 401) localStorage.removeItem('admin_api_key');
+                return;
+            }
             const data = await response.json();
-            
+
             document.getElementById('stat-devices-total').textContent = data.devices.total;
             document.getElementById('stat-devices-online').textContent = data.devices.online;
             document.getElementById('stat-devices-offline').textContent = data.devices.offline;
@@ -104,9 +108,16 @@
             const response = await fetch('/api/v1/admin/devices', {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
-            const devices = await response.json();
-            
             const tbody = document.getElementById('devices-table');
+
+            if (!response.ok) {
+                if (response.status === 401) localStorage.removeItem('admin_api_key');
+                const err = await response.json().catch(() => ({}));
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Failed to load devices (${response.status}): ${err.detail || 'invalid/missing admin key - reload to re-enter'}</td></tr>`;
+                return;
+            }
+
+            const devices = await response.json();
             if (devices.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No devices registered</td></tr>';
                 return;

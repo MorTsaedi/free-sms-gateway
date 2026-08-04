@@ -7,6 +7,7 @@ import os
 
 from server.database import get_db, DownloadToken
 from server.config import settings
+from server.auth import get_admin_api_key
 
 router = APIRouter(prefix="/api/v1/apk", tags=["apk"])
 
@@ -18,19 +19,13 @@ async def download_apk(token: str, db: AsyncSession = Depends(get_db)):
     
     if not download_token:
         raise HTTPException(status_code=404, detail="Invalid or expired download token")
-    
-    if download_token.used:
-        raise HTTPException(status_code=410, detail="Download token already used")
-    
+
     if download_token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=410, detail="Download token expired")
-    
+
     if not os.path.exists(download_token.apk_path):
         raise HTTPException(status_code=404, detail="APK file not found")
-    
-    download_token.used = True
-    await db.commit()
-    
+
     return FileResponse(
         download_token.apk_path,
         media_type="application/vnd.android.package-archive",

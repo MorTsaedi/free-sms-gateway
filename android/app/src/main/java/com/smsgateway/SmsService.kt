@@ -1,14 +1,15 @@
 package com.smsgateway
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.telephony.SmsManager
 import android.util.Log
-import androidx.lifecycle.LifecycleService
+import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 
-class SmsService : LifecycleService() {
+class SmsService : Service() {
     private val TAG = "SmsService"
     private var job: Job? = null
     private val apiClient by lazy { ApiClient(this) }
@@ -20,6 +21,9 @@ class SmsService : LifecycleService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Never leave a previous polling loop running: startService()/START_STICKY can call
+        // this repeatedly, and each orphaned loop would otherwise keep polling in parallel.
+        job?.cancel()
         job = scope.launch {
             while (isActive) {
                 try {
@@ -46,7 +50,7 @@ class SmsService : LifecycleService() {
         }
     }
 
-    private suspend fun sendSms(sms: ApiClient.SmsItem) {
+    private suspend fun sendSms(sms: SmsItem) {
         Log.i(TAG, "Sending SMS to ${sms.to_number}")
         
         try {
@@ -87,11 +91,11 @@ class SmsService : LifecycleService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        return android.app.NotificationCompat.Builder(this, channelId)
+        return NotificationCompat.Builder(this, channelId)
             .setContentTitle("SMS Gateway")
             .setContentText("Running in background")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(android.app.NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()
     }
