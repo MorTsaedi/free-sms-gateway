@@ -45,7 +45,7 @@ class ApiClient(private val context: Context) {
     private val baseUrl: String
         get() = prefs.getString("vm_url", "http://localhost:8000")!!
 
-    private val apiKey: String
+    val apiKey: String
         get() = prefs.getString("api_key", "")!!
 
     private fun authHeaders() = Headers.Builder()
@@ -100,6 +100,23 @@ class ApiClient(private val context: Context) {
         client.newCall(httpRequest).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("SMS result failed: ${response.code}")
+            }
+        }
+    }
+
+    suspend fun reportDelivery(smsId: Int, success: Boolean) = withContext(Dispatchers.IO) {
+        val json = gson.toJson(mapOf("success" to success))
+        val requestBody = RequestBody.create("application/json".toMediaType(), json)
+
+        val httpRequest = Request.Builder()
+            .url("$baseUrl/api/v1/device/sms/$smsId/delivery")
+            .headers(authHeaders())
+            .post(requestBody)
+            .build()
+
+        client.newCall(httpRequest).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Delivery report failed: ${response.code}")
             }
         }
     }

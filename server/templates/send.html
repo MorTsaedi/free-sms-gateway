@@ -1,209 +1,152 @@
 {% extends "base.html" %}
 
-{% block title %}Send SMS - SMS Gateway{% endblock %}
+{% block title %}Send SMS — Relay{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h2 class="text-2xl font-bold text-gray-900">Send SMS</h2>
-    <p class="text-gray-600 mt-1">Queue an SMS message to be sent by a device</p>
+<div class="mb-6">
+    <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 mb-1">Dispatch</p>
+    <h1 class="font-display text-2xl sm:text-3xl font-semibold text-slate-900">Send SMS</h1>
+    <p class="text-sm text-slate-500 mt-1">Queue a message — the next available phone sends it.</p>
 </div>
 
-<div class="bg-white rounded-lg shadow p-6 mb-8 max-w-2xl">
-    <form id="send-form" class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Device</label>
-            <select id="device-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                <option value="">Select a device</option>
-            </select>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+    <!-- Compose -->
+    <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></span>
+            <h3 class="font-display font-semibold text-slate-900">Compose message</h3>
         </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">To Number</label>
-            <input type="tel" id="to-number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+1234567890" required>
-        </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
-            <textarea id="message" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your message here..." required></textarea>
-        </div>
-        
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">Send SMS</button>
-    </form>
-    
-    <div id="send-result" class="mt-4 hidden p-4 rounded-lg"></div>
-</div>
 
-<div class="bg-white rounded-lg shadow">
-    <div class="px-6 py-4 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">Recent SMS Queue</h3>
+        <form id="send-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">Relay device</label>
+                <select id="device-select" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                    <option value="">Select a device…</option>
+                </select>
+                <p class="text-[11px] text-slate-400 mt-1">Only online devices can accept messages.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">Recipient number</label>
+                <input type="tel" id="to-number" placeholder="+15551234567" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">Message</label>
+                <textarea id="message" rows="4" placeholder="Type your message…" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10 resize-none"></textarea>
+                <div class="flex items-center justify-between mt-1">
+                    <span class="text-[11px] text-slate-400">160 chars per SMS part</span>
+                    <span id="char-count" class="font-mono text-[11px] text-slate-400">0</span>
+                </div>
+            </div>
+            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-[#0b1320] hover:bg-black text-white text-sm font-medium py-2.5 rounded-xl transition shadow-sm">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/></svg>
+                Queue message
+            </button>
+        </form>
     </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200" id="sms-table">
-                <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading...</td>
-                </tr>
-            </tbody>
-        </table>
+
+    <!-- Queue -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-display font-semibold text-slate-900">Queue</h3>
+            <span id="queue-count" class="font-mono text-xs text-slate-400">…</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-100">
+                <thead>
+                    <tr class="text-left text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                        <th class="px-6 py-3">To</th>
+                        <th class="px-6 py-3">Message</th>
+                        <th class="px-6 py-3">Status</th>
+                        <th class="px-6 py-3">Queued</th>
+                        <th class="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="sms-table" class="divide-y divide-slate-100">
+                    <tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    async function loadDevices() {
-        try {
-            const response = await fetch('/api/v1/admin/devices', {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            if (!response.ok) { if (response.status === 401) localStorage.removeItem('admin_api_key'); return; }
-            const devices = await response.json();
+    const STATUS_HEX = { pending:'#f5a524', claimed:'#3b82f6', sent:'#3b82f6', delivered:'#22b57a', failed:'#e5484d' };
+    const STATUS_LABEL = { pending:'Queued', claimed:'Claimed', sent:'Sent', delivered:'Delivered', failed:'Failed' };
+    function statusBadge(st){
+        const c = STATUS_HEX[st] || '#94a3b8';
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium" style="background:${c}1a;color:${c}">
+            <span class="w-1.5 h-1.5 rounded-full" style="background:${c}"></span>${STATUS_LABEL[st] || st}</span>`;
+    }
 
+    async function loadDevices(){
+        try{
+            const devices = await api('/api/v1/admin/devices');
+            const online = devices.filter(d=>d.status==='online');
             const select = document.getElementById('device-select');
-            select.innerHTML = '<option value="">Select a device</option>' + devices
-                .filter(d => d.status === 'online')
-                .map(d => `<option value="${d.id}">${d.name} (${d.status})</option>`)
-                .join('');
-        } catch (e) {
-            console.error('Failed to load devices', e);
-        }
-    }
-
-    async function loadSMSQueue() {
-        try {
-            const response = await fetch('/api/v1/sms/queue?page_size=20', {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            const tbody = document.getElementById('sms-table');
-
-            if (!response.ok) {
-                if (response.status === 401) localStorage.removeItem('admin_api_key');
-                const err = await response.json().catch(() => ({}));
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Failed to load queue (${response.status}): ${err.detail || 'invalid/missing admin key - reload to re-enter'}</td></tr>`;
-                return;
-            }
-
-            const data = await response.json();
-            if (data.items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No SMS in queue</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = data.items.map(sms => `
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sms.device_id}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sms.to_number}</td>
-                    <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">${sms.message}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClass(sms.status)}">
-                            ${sms.status}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(sms.created_at).toLocaleString()}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        ${sms.status === 'failed' ? `<button onclick="retrySMS(${sms.id})" class="text-blue-600 hover:text-blue-900 mr-3">Retry</button>` : ''}
-                        <button onclick="deleteSMS(${sms.id})" class="text-red-600 hover:text-red-900">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        } catch (e) {
-            console.error('Failed to load SMS queue', e);
-        }
-    }
-
-    function getStatusClass(status) {
-        switch (status) {
-            case 'pending': return 'bg-yellow-100 text-yellow-800';
-            case 'sent': return 'bg-blue-100 text-blue-800';
-            case 'delivered': return 'bg-green-100 text-green-800';
-            case 'failed': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    document.getElementById('send-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const deviceId = document.getElementById('device-select').value;
-        const toNumber = document.getElementById('to-number').value;
-        const message = document.getElementById('message').value;
-        
-        if (!deviceId || !toNumber || !message) {
-            return alert('Please fill all fields');
-        }
-        
-        try {
-            const response = await fetch('/api/v1/sms/send', {
-                method: 'POST',
-                headers: { 
-                    'X-API-Key': localStorage.getItem('admin_api_key'),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ device_id: parseInt(deviceId), to_number: toNumber, message })
-            });
-            
-            const resultDiv = document.getElementById('send-result');
-            if (response.ok) {
-                resultDiv.className = 'mt-4 p-4 rounded-lg bg-green-50 text-green-800';
-                resultDiv.textContent = 'SMS queued successfully!';
-                resultDiv.classList.remove('hidden');
-                document.getElementById('send-form').reset();
-                loadSMSQueue();
+            if(!online.length){
+                select.innerHTML = '<option value="">No online devices</option>';
+                document.getElementById('char-count');
             } else {
-                const err = await response.json();
-                resultDiv.className = 'mt-4 p-4 rounded-lg bg-red-50 text-red-800';
-                resultDiv.textContent = 'Error: ' + err.detail;
-                resultDiv.classList.remove('hidden');
+                select.innerHTML = '<option value="">Select a device…</option>' + online.map(d=>`<option value="${d.id}">${esc(d.name)} · #${d.id}</option>`).join('');
             }
-        } catch (e) {
-            console.error('Failed to send SMS', e);
-        }
-    });
-
-    async function retrySMS(id) {
-        try {
-            const response = await fetch(`/api/v1/sms/retry/${id}`, {
-                method: 'POST',
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            if (response.ok) loadSMSQueue();
-        } catch (e) {
-            console.error('Failed to retry SMS', e);
-        }
+        }catch(e){}
     }
 
-    async function deleteSMS(id) {
-        if (!confirm('Delete this SMS from queue?')) return;
-        
-        try {
-            const response = await fetch(`/api/v1/sms/${id}`, {
-                method: 'DELETE',
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            if (response.ok) loadSMSQueue();
-        } catch (e) {
-            console.error('Failed to delete SMS', e);
-        }
+    async function loadQueue(){
+        const tbody = document.getElementById('sms-table');
+        try{
+            const data = await api('/api/v1/sms/queue?page_size=20');
+            document.getElementById('queue-count').textContent = data.total + ' total';
+            if(!data.items.length){
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center"><div class="text-slate-400 text-sm">Queue is empty — compose a message on the left.</div></td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.items.map(s=>`
+                <tr class="hover:bg-slate-50/60 transition">
+                    <td class="px-6 py-3.5"><span class="font-mono text-sm text-slate-800">${esc(s.to_number)}</span></td>
+                    <td class="px-6 py-3.5"><span class="text-sm text-slate-600 max-w-[200px] block truncate">${esc(s.message)}</span></td>
+                    <td class="px-6 py-3.5">${statusBadge(s.status)}</td>
+                    <td class="px-6 py-3.5 text-sm text-slate-500">${new Date(s.created_at).toLocaleString()}</td>
+                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                        ${s.status==='failed' ? `<button onclick="retrySMS(${s.id})" class="text-xs font-medium text-amber-600 hover:text-amber-700 mr-3">Retry</button>` : ''}
+                        <button onclick="deleteSMS(${s.id})" class="text-slate-400 hover:text-red-600 transition" title="Delete">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                        </button>
+                    </td>
+                </tr>`).join('');
+        }catch(e){ if(e.status!==401) tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-10 text-center text-red-500 text-sm">Couldn’t load queue: ${esc(e.message)}</td></tr>`; }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!localStorage.getItem('admin_api_key')) {
-            const key = prompt('Enter your admin API key:');
-            if (key) localStorage.setItem('admin_api_key', key);
-        }
-        loadDevices();
-        loadSMSQueue();
-        setInterval(loadSMSQueue, 10000);
+    document.getElementById('send-form').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const deviceId = document.getElementById('device-select').value;
+        const toNumber = document.getElementById('to-number').value.trim();
+        const message = document.getElementById('message').value.trim();
+        if(!deviceId){ toast('Choose a relay device', 'error'); return; }
+        if(!toNumber){ toast('Enter a recipient number', 'error'); return; }
+        if(!message){ toast('Write a message first', 'error'); return; }
+        try{
+            await api('/api/v1/sms/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ device_id: parseInt(deviceId), to_number: toNumber, message }) });
+            toast('Message queued', 'success');
+            e.target.reset(); document.getElementById('char-count').textContent='0';
+            loadQueue();
+        }catch(err){ toast('Couldn’t queue: '+err.message, 'error'); }
     });
+
+    document.getElementById('message').addEventListener('input', ()=>{
+        const n = document.getElementById('message').value.length;
+        document.getElementById('char-count').textContent = n + (n>160 ? ' · ' + Math.ceil(n/160) + ' parts' : '');
+    });
+
+    async function retrySMS(id){ try{ await api('/api/v1/sms/retry/'+id, {method:'POST'}); toast('Queued again', 'success'); loadQueue(); }catch(e){ toast(e.message,'error'); } }
+    async function deleteSMS(id){
+        if(!confirm('Delete this message from the queue?')) return;
+        try{ await api('/api/v1/sms/'+id, {method:'DELETE'}); toast('Message deleted','success'); loadQueue(); }catch(e){ toast(e.message,'error'); }
+    }
+
+    async function refresh(){ await Promise.all([loadDevices(), loadQueue()]); }
+    document.addEventListener('DOMContentLoaded', () => { if(!getKey()) showAuth(); else refresh(); setInterval(loadQueue, 10000); });
 </script>
 {% endblock %}

@@ -71,16 +71,21 @@ async def poll_sms(device: Device = Depends(get_device_api_key), db: AsyncSessio
     # handed to a device exactly once: if the app polls with two loops (or polls repeatedly),
     # the second poll finds nothing left to claim, so the same SMS can't be sent twice.
     # The app reports the actual outcome afterwards via /sms/{id}/result (SENT vs FAILED).
+    # Also re-claim CLAIMED SMS older than 5 minutes from ANY device (app may have crashed
+    # before reporting, so we release stale claims back to pending and let another device pick them up).
     claimed = (await db.execute(
         text(
-            "UPDATE sms_queue SET status='SENT', sent_at=:now "
+            "UPDATE sms_queue SET status='CLAIMED' "
             "WHERE id IN ("
-            "  SELECT id FROM sms_queue "
-            "  WHERE device_id=:did AND status='PENDING' ORDER BY created_at LIMIT :lim"
+            "  SELECT id FROM (SELECT id FROM sms_queue "
+            "    WHERE device_id=:did AND status='PENDING' ORDER BY created_at LIMIT :lim)"
+            "  UNION"
+            "  SELECT id FROM (SELECT id FROM sms_queue "
+            "    WHERE status='CLAIMED' AND created_at < datetime('now', '-5 minutes') ORDER BY created_at LIMIT :lim)"
             ") "
             "RETURNING id, to_number, message"
         ),
-        {"now": datetime.utcnow(), "did": device.id, "lim": 20},
+        {"did": device.id, "lim": 20},
     )).mappings().all()
     await db.commit()
 
@@ -113,8 +118,39 @@ async def sms_result(sms_id: int, payload: SmsResultPayload, device: Device = De
     if not sms:
         raise HTTPException(status_code=404, detail="SMS not found")
 
-    sms.status = SMSStatus.SENT if payload.success else SMSStatus.FAILED
-    sms.error_message = payload.error
+    if payload.success:
+        sms.status = SMSStatus.SENT
+        sms.sent_at = datetime.utcnow()
+    else:
+        sms.status = SMSStatus.FAILED
+        sms.error_message = payload.error
+    await db.commit()
+
+    return {"status": "ok"}
+
+
+class DeliveryReportPayload(BaseModel):
+    success: bool
+
+
+@router.post("/sms/{sms_id}/delivery")
+async def delivery_report(sms_id: int, payload: DeliveryReportPayload, device: Device = Depends(get_device_api_key), db: AsyncSession = Depends(get_db)):
+    """Report SMS delivery status from the device."""
+    result = await db.execute(select(SMSQueue).where(SMSQueue.id == sms_id, SMSQueue.device_id == device.id))
+    sms = result.scalar_one_or_none()
+
+    if not sms:
+        raise HTTPException(status_code=404, detail="SMS not found")
+
+    if sms.status != SMSStatus.SENT:
+        # Only update delivery status for SMS that was already marked as sent
+        raise HTTPException(status_code=400, detail="Can only report delivery for sent SMS")
+
+    if payload.success:
+        sms.status = SMSStatus.DELIVERED
+    else:
+        sms.status = SMSStatus.FAILED
+        sms.error_message = "Delivery failed"
     await db.commit()
 
     return {"status": "ok"}
