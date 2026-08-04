@@ -1,0 +1,25 @@
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Secrets / runtime data (do NOT commit) ---
+.env
+data/
+build_config.local.yaml
+
+# --- Android build outputs & local config ---
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
+# --- Built/downloaded artifacts ---
+static/downloads/
+
+# --- OS/editor ---
+.DS_Store
+*.swp
+.idea/

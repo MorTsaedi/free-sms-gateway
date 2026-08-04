@@ -66,8 +66,9 @@
             const response = await fetch('/api/v1/admin/devices', {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
+            if (!response.ok) { if (response.status === 401) localStorage.removeItem('admin_api_key'); return; }
             const devices = await response.json();
-            
+
             const select = document.getElementById('device-select');
             select.innerHTML = '<option value="">Select a device</option>' + devices
                 .filter(d => d.status === 'online')
@@ -83,9 +84,16 @@
             const response = await fetch('/api/v1/sms/queue?page_size=20', {
                 headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
             });
-            const data = await response.json();
-            
             const tbody = document.getElementById('sms-table');
+
+            if (!response.ok) {
+                if (response.status === 401) localStorage.removeItem('admin_api_key');
+                const err = await response.json().catch(() => ({}));
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Failed to load queue (${response.status}): ${err.detail || 'invalid/missing admin key - reload to re-enter'}</td></tr>`;
+                return;
+            }
+
+            const data = await response.json();
             if (data.items.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No SMS in queue</td></tr>';
                 return;

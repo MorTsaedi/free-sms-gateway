@@ -52,6 +52,8 @@ class DeviceResponse(BaseModel):
     status: str
     last_seen: Optional[datetime]
     created_at: datetime
+    # Only populated on create so the plaintext key is shown exactly once.
+    api_key: Optional[str] = None
 
 
 class APIKeyCreateRequest(BaseModel):
@@ -110,6 +112,7 @@ async def create_device(request: DeviceCreateRequest, admin: str = Depends(get_a
         status=device.status.value,
         last_seen=device.last_seen,
         created_at=device.created_at,
+        api_key=api_key,
     )
 
 

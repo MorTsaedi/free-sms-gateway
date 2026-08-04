@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class PollingWorker(
     context: Context,
@@ -22,7 +23,7 @@ class PollingWorker(
                 val heartbeatInterval = applicationContext.getSharedPreferences("sms_gateway", Context.MODE_PRIVATE)
                     .getInt("heartbeat_interval", 60)
                 
-                apiClient.heartbeat(ApiClient.HeartbeatRequest())
+                apiClient.heartbeat(HeartbeatRequest())
                 
                 scheduleNextPoll(heartbeatInterval)
                 Result.success()

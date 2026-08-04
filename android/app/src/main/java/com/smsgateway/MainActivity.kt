@@ -92,8 +92,9 @@ class MainActivity : AppCompatActivity() {
                 logMessage("Connection test successful. Pending SMS: ${response.sms_list.size}")
                 Toast.makeText(this@MainActivity, "Connection successful!", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                logMessage("Connection test failed: ${e.message}")
-                Toast.makeText(this@MainActivity, "Connection failed: ${e.message}", Toast.LENGTH_LONG).show()
+                val reason = e.message ?: e.javaClass.simpleName
+                logMessage("Connection test failed: $reason")
+                Toast.makeText(this@MainActivity, "Connection failed: $reason", Toast.LENGTH_LONG).show()
             }
         }
     }
