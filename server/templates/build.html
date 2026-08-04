@@ -1,157 +1,133 @@
 {% extends "base.html" %}
 
-{% block title %}Build APK - SMS Gateway{% endblock %}
+{% block title %}Build APK — Relay{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h2 class="text-2xl font-bold text-gray-900">Build APK</h2>
-    <p class="text-gray-600 mt-1">Generate a custom APK with your configuration</p>
+<div class="mb-6">
+    <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 mb-1">Ship the app</p>
+    <h1 class="font-display text-2xl sm:text-3xl font-semibold text-slate-900">Build APK</h1>
+    <p class="text-sm text-slate-500 mt-1">Package a Relay app pre-wired to this gateway, then hand it to a phone.</p>
 </div>
 
-<div class="bg-white rounded-lg shadow p-6 mb-8 max-w-2xl">
-    <form id="build-form" class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">VM URL</label>
-            <input type="url" id="vm-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://your-domain.com" required>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+    <!-- Builder -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-7">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+            <h3 class="font-display font-semibold text-slate-900">Package configuration</h3>
         </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Device API Key</label>
-            <input type="text" id="api-key" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Device API key (from Devices page)" required>
-        </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Package Name</label>
-            <input type="text" id="package-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="com.smsgateway">
-        </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">App Name</label>
-            <input type="text" id="app-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="SMS Gateway">
-        </div>
-        
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Poll Interval (seconds)</label>
-                <input type="number" id="poll-interval" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="15" min="5" max="300">
+
+        <form id="build-form" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Gateway URL</label>
+                    <input type="url" id="vm-url" placeholder="https://your-server.com" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Device API key</label>
+                    <input type="text" id="api-key" placeholder="Key from Devices page" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-mono focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">App name</label>
+                    <input type="text" id="app-name" value="Relay" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Package name</label>
+                    <input type="text" id="package-name" value="com.smsgateway" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-mono focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Poll interval (s)</label>
+                    <input type="number" id="poll-interval" value="15" min="5" max="300" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Heartbeat (s)</label>
+                    <input type="number" id="heartbeat-interval" value="60" min="30" max="3600" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Heartbeat Interval (seconds)</label>
-                <input type="number" id="heartbeat-interval" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="60" min="30" max="3600">
+
+            <button type="submit" id="build-btn" class="w-full inline-flex items-center justify-center gap-2 bg-[#0b1320] hover:bg-black text-white text-sm font-medium py-3 rounded-xl transition shadow-sm">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+                Build APK
+            </button>
+
+            <div id="build-progress" class="hidden">
+                <div class="bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div class="bg-amber-500 h-2 rounded-full animate-pulse" style="width:100%"></div>
+                </div>
+                <p class="text-sm text-slate-500 mt-2 text-center">Compiling on the server… this can take a couple of minutes.</p>
             </div>
-        </div>
-        
-        <button type="submit" id="build-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">Build APK</button>
-    </form>
-    
-    <div id="build-result" class="mt-4 hidden"></div>
-    
-    <div id="build-progress" class="mt-4 hidden">
-        <div class="bg-gray-100 rounded-full h-2">
-            <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
-        </div>
-        <p class="text-sm text-gray-600 mt-2 text-center">Building APK... This may take a few minutes.</p>
+
+            <div id="build-result" class="hidden"></div>
+        </form>
     </div>
-</div>
 
-<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Current Build Configuration</h3>
-    <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm" id="current-config">
-        Loading...
+    <!-- Current config -->
+    <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <h3 class="font-display font-semibold text-slate-900 mb-4">Current build config</h3>
+        <pre id="current-config" class="bg-slate-50 rounded-xl p-4 font-mono text-xs text-slate-600 overflow-x-auto whitespace-pre-wrap">Loading…</pre>
+        <p class="text-xs text-slate-400 mt-4 leading-relaxed">The finished APK is served once from a one-hour download link. Share it with the phone owner.</p>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    async function loadConfig() {
-        try {
-            const response = await fetch('/api/v1/apk/build-config', {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            const config = await response.json();
-            
-            document.getElementById('vm-url').value = config.vm.url || '';
-            document.getElementById('api-key').value = config.vm.api_key || '';
-            document.getElementById('package-name').value = config.app.package_name || '';
-            document.getElementById('app-name').value = config.app.app_name || '';
-            document.getElementById('poll-interval').value = config.app.poll_interval_seconds || 15;
-            document.getElementById('heartbeat-interval').value = config.app.heartbeat_interval_seconds || 60;
-            
+    async function loadConfig(){
+        try{
+            const config = await api('/api/v1/apk/build-config');
+            ['vm-url','api-key','package-name','app-name','poll-interval','heartbeat-interval'].forEach(id=>document.getElementById(id).value='');
+            if(config.vm) document.getElementById('vm-url').value = config.vm.url || '';
+            if(config.vm.api_key) document.getElementById('api-key').value = config.vm.api_key || '';
+            if(config.app) {
+                document.getElementById('package-name').value = config.app.package_name || 'com.smsgateway';
+                document.getElementById('app-name').value = config.app.app_name || 'Relay';
+                document.getElementById('poll-interval').value = config.app.poll_interval_seconds || 15;
+                document.getElementById('heartbeat-interval').value = config.app.heartbeat_interval_seconds || 60;
+            }
             document.getElementById('current-config').textContent = JSON.stringify(config, null, 2);
-        } catch (e) {
-            console.error('Failed to load config', e);
-        }
+        }catch(e){}
     }
 
-    document.getElementById('build-form').addEventListener('submit', async (e) => {
+    document.getElementById('build-form').addEventListener('submit', async (e)=>{
         e.preventDefault();
-        
         const btn = document.getElementById('build-btn');
         const progress = document.getElementById('build-progress');
         const result = document.getElementById('build-result');
-        
-        btn.disabled = true;
-        btn.classList.add('hidden');
-        progress.classList.remove('hidden');
-        result.classList.add('hidden');
-        
+
+        btn.disabled = true; btn.classList.add('hidden'); progress.classList.remove('hidden'); result.classList.add('hidden');
+
         const payload = {
             vm_url: document.getElementById('vm-url').value,
             api_key: document.getElementById('api-key').value,
             package_name: document.getElementById('package-name').value,
             app_name: document.getElementById('app-name').value,
-            poll_interval_seconds: parseInt(document.getElementById('poll-interval').value),
-            heartbeat_interval_seconds: parseInt(document.getElementById('heartbeat-interval').value),
+            poll_interval_seconds: parseInt(document.getElementById('poll-interval').value) || 15,
+            heartbeat_interval_seconds: parseInt(document.getElementById('heartbeat-interval').value) || 60,
         };
-        
-        try {
-            const response = await fetch('/api/v1/admin/apk/build', {
-                method: 'POST',
-                headers: { 
-                    'X-API-Key': localStorage.getItem('admin_api_key'),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            progress.classList.add('hidden');
-            btn.disabled = false;
-            btn.classList.remove('hidden');
-            
-            if (response.ok) {
-                const data = await response.json();
-                result.className = 'mt-4 p-4 rounded-lg bg-green-50 text-green-800';
-                result.innerHTML = `
-                    <strong>APK built successfully!</strong><br>
-                    <a href="${data.download_url}" class="text-blue-600 underline mt-2 block" target="_blank">Download APK</a>
-                    <p class="text-sm text-gray-600 mt-2">Link expires in 1 hour. Share this URL with the device owner.</p>
-                `;
-                result.classList.remove('hidden');
-                loadConfig();
-            } else {
-                const err = await response.json();
-                result.className = 'mt-4 p-4 rounded-lg bg-red-50 text-red-800';
-                result.textContent = 'Error: ' + err.detail;
-                result.classList.remove('hidden');
-            }
-        } catch (e) {
-            progress.classList.add('hidden');
-            btn.disabled = false;
-            btn.classList.remove('hidden');
-            result.className = 'mt-4 p-4 rounded-lg bg-red-50 text-red-800';
-            result.textContent = 'Error: ' + e.message;
+
+        try{
+            const data = await api('/api/v1/admin/apk/build', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            progress.classList.add('hidden'); btn.disabled=false; btn.classList.remove('hidden');
+            result.className = 'hidden rounded-2xl border border-emerald-500/30 bg-emerald-50 p-5';
             result.classList.remove('hidden');
-            console.error('Build failed', e);
+            result.innerHTML = `
+                <div class="flex items-center gap-2 mb-2"><span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">✓</span>
+                <span class="font-medium text-emerald-800">APK built successfully</span></div>
+                <a href="${esc(data.download_url)}" class="inline-flex items-center gap-2 mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+                    Download APK</a>
+                <p class="text-xs text-emerald-700/80 mt-3">Link expires in 1 hour.</p>`;
+            toast('APK built', 'success');
+            loadConfig();
+        }catch(err){
+            progress.classList.add('hidden'); btn.disabled=false; btn.classList.remove('hidden');
+            result.className = 'hidden rounded-2xl border border-red-500/30 bg-red-50 p-5';
+            result.classList.remove('hidden');
+            result.innerHTML = `<div class="font-medium text-red-800">Build failed</div><p class="text-sm text-red-700 mt-1">${esc(err.message)}</p>`;
+            toast('Build failed: '+err.message, 'error');
         }
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!localStorage.getItem('admin_api_key')) {
-            const key = prompt('Enter your admin API key:');
-            if (key) localStorage.setItem('admin_api_key', key);
-        }
-        loadConfig();
-    });
+    document.addEventListener('DOMContentLoaded', () => { if(!getKey()) showAuth(); else loadConfig(); });
 </script>
 {% endblock %}

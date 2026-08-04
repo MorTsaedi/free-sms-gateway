@@ -1,52 +1,50 @@
 {% extends "base.html" %}
 
-{% block title %}Logs - SMS Gateway{% endblock %}
+{% block title %}Activity — Relay{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h2 class="text-2xl font-bold text-gray-900">SMS Activity Logs</h2>
-    <p class="text-gray-600 mt-1">Recent SMS sending activity</p>
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+    <div>
+        <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 mb-1">History</p>
+        <h1 class="font-display text-2xl sm:text-3xl font-semibold text-slate-900">Activity log</h1>
+        <p class="text-sm text-slate-500 mt-1">Every message that passed through the gateway.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <select id="status-filter" class="px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+            <option value="">All statuses</option>
+            <option value="pending">Queued</option>
+            <option value="claimed">Claimed</option>
+            <option value="sent">Sent</option>
+            <option value="delivered">Delivered</option>
+            <option value="failed">Failed</option>
+        </select>
+        <select id="device-filter" class="px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+            <option value="">All devices</option>
+        </select>
+    </div>
 </div>
 
-<div class="bg-white rounded-lg shadow">
-    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 class="text-lg font-medium text-gray-900">Recent SMS</h3>
-        <div class="flex space-x-2">
-            <select id="status-filter" class="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="sent">Sent</option>
-                <option value="delivered">Delivered</option>
-                <option value="failed">Failed</option>
-            </select>
-            <select id="device-filter" class="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Devices</option>
-            </select>
-        </div>
-    </div>
+<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+        <table class="min-w-full divide-y divide-slate-100">
+            <thead>
+                <tr class="text-left text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                    <th class="px-6 py-3">#</th>
+                    <th class="px-6 py-3">Device</th>
+                    <th class="px-6 py-3">To</th>
+                    <th class="px-6 py-3">Message</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Created</th>
+                    <th class="px-6 py-3">Sent</th>
+                    <th class="px-6 py-3">Error</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200" id="logs-table">
-                <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading...</td>
-                </tr>
+            <tbody id="logs-table" class="divide-y divide-slate-100">
+                <tr><td colspan="8" class="px-6 py-10 text-center text-slate-400">Loading…</td></tr>
             </tbody>
         </table>
     </div>
-    <div class="px-6 py-4 border-t border-gray-200 flex justify-center" id="pagination">
-    </div>
+    <div id="pagination" class="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2"></div>
 </div>
 {% endblock %}
 
@@ -55,129 +53,82 @@
     let currentPage = 1;
     const pageSize = 20;
 
-    async function loadLogs() {
-        try {
+    const STATUS_HEX = { pending:'#f5a524', claimed:'#3b82f6', sent:'#3b82f6', delivered:'#22b57a', failed:'#e5484d' };
+    const STATUS_LABEL = { pending:'Queued', claimed:'Claimed', sent:'Sent', delivered:'Delivered', failed:'Failed' };
+    function statusBadge(st){
+        const c = STATUS_HEX[st] || '#94a3b8';
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium" style="background:${c}1a;color:${c}">
+            <span class="w-1.5 h-1.5 rounded-full" style="background:${c}"></span>${STATUS_LABEL[st] || st}</span>`;
+    }
+
+    async function loadLogs(){
+        const tbody = document.getElementById('logs-table');
+        try{
             const status = document.getElementById('status-filter').value;
             const deviceId = document.getElementById('device-filter').value;
-            
             let url = `/api/v1/sms/queue?page=${currentPage}&page_size=${pageSize}`;
-            if (status) url += `&status=${status}`;
-            if (deviceId) url += `&device_id=${deviceId}`;
-            
-            const response = await fetch(url, {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            const tbody = document.getElementById('logs-table');
+            if(status) url += `&status=${status}`;
+            if(deviceId) url += `&device_id=${deviceId}`;
 
-            if (!response.ok) {
-                if (response.status === 401) localStorage.removeItem('admin_api_key');
-                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load logs (${response.status}) - reload to re-enter admin key if unauthorized</td></tr>`;
-                return;
-            }
+            const data = await api(url);
 
-            const data = await response.json();
-            if (data.items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">No SMS logs found</td></tr>';
+            if(!data.items.length){
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-12 text-center text-slate-400 text-sm">Nothing here — adjust the filters or send a message.</td></tr>';
             } else {
-                tbody.innerHTML = data.items.map(sms => `
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sms.id}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sms.device_id}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sms.to_number}</td>
-                        <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">${sms.message}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClass(sms.status)}">
-                                ${sms.status}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(sms.created_at).toLocaleString()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sms.sent_at ? new Date(sms.sent_at).toLocaleString() : '-'}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">${sms.error_message || '-'}</td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = data.items.map(s=>`
+                    <tr class="hover:bg-slate-50/60 transition">
+                        <td class="px-6 py-3.5 font-mono text-xs text-slate-400">#${s.id}</td>
+                        <td class="px-6 py-3.5 text-sm text-slate-700">${deviceName(s.device_id)}</td>
+                        <td class="px-6 py-3.5 font-mono text-sm text-slate-800">${esc(s.to_number)}</td>
+                        <td class="px-6 py-3.5"><span class="text-sm text-slate-600 max-w-[220px] block truncate" title="${esc(s.message)}">${esc(s.message)}</span></td>
+                        <td class="px-6 py-3.5">${statusBadge(s.status)}</td>
+                        <td class="px-6 py-3.5 text-sm text-slate-500 whitespace-nowrap">${new Date(s.created_at).toLocaleString()}</td>
+                        <td class="px-6 py-3.5 text-sm text-slate-500 whitespace-nowrap">${s.sent_at ? new Date(s.sent_at).toLocaleString() : '—'}</td>
+                        <td class="px-6 py-3.5 text-sm text-red-500 max-w-[140px] truncate" title="${esc(s.error_message)}">${s.error_message ? esc(s.error_message) : '—'}</td>
+                    </tr>`).join('');
             }
-            
             renderPagination(data.total, data.page, data.page_size);
-            await loadDeviceFilter();
-        } catch (e) {
-            console.error('Failed to load logs', e);
+        }catch(e){
+            if(e.status!==401) tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-10 text-center text-red-500 text-sm">Couldn’t load activity: ${esc(e.message)}</td></tr>`;
         }
     }
 
-    function getStatusClass(status) {
-        switch (status) {
-            case 'pending': return 'bg-yellow-100 text-yellow-800';
-            case 'sent': return 'bg-blue-100 text-blue-800';
-            case 'delivered': return 'bg-green-100 text-green-800';
-            case 'failed': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+    const deviceCache = {};
+    function deviceName(id){
+        const d = deviceCache[id];
+        return d !== undefined ? d : `#${id}`;
     }
 
-    async function loadDeviceFilter() {
-        try {
-            const response = await fetch('/api/v1/admin/devices', {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            if (!response.ok) { if (response.status === 401) localStorage.removeItem('admin_api_key'); return; }
-            const devices = await response.json();
-
+    async function loadDeviceFilter(){
+        try{
+            const devices = await api('/api/v1/admin/devices');
+            devices.forEach(d=> deviceCache[d.id] = d.name);
             const select = document.getElementById('device-filter');
-            const currentValue = select.value;
-            select.innerHTML = '<option value="">All Devices</option>' + devices
-                .map(d => `<option value="${d.id}" ${d.id == currentValue ? 'selected' : ''}>${d.name}</option>`)
-                .join('');
-        } catch (e) {
-            console.error('Failed to load devices for filter', e);
-        }
+            const cur = select.value;
+            select.innerHTML = '<option value="">All devices</option>' + devices.map(d=>`<option value="${d.id}" ${String(d.id)===cur?'selected':''}>${esc(d.name)}</option>`).join('');
+            if(cur && cur !== '') loadLogs();
+        }catch(e){}
     }
 
-    function renderPagination(total, page, pageSize) {
-        const totalPages = Math.ceil(total / pageSize);
-        const pagination = document.getElementById('pagination');
-        
-        if (totalPages <= 1) {
-            pagination.innerHTML = '';
-            return;
-        }
-        
+    function renderPagination(total, page, ps){
+        const totalPages = Math.ceil(total/ps);
+        const box = document.getElementById('pagination');
+        if(totalPages <= 1){ box.innerHTML = ''; return; }
         let html = '';
-        if (page > 1) {
-            html += `<button onclick="changePage(${page - 1})" class="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Previous</button>`;
+        html += `<button onclick="changePage(${page-1})" ${page<=1?'disabled class="opacity-40 cursor-not-allowed px-3 py-1.5 rounded-lg border border-slate-200 text-sm":"class=\"px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50\""}>← Prev</button>`;
+        for(let i=Math.max(1,page-2); i<=Math.min(totalPages,page+2); i++){
+            html += `<button onclick="changePage(${i})" class="px-3 py-1.5 rounded-lg text-sm ${i===page?'bg-[#0b1320] text-white':'border border-slate-200 hover:bg-slate-50'}">${i}</button>`;
         }
-        
-        for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) {
-            html += `<button onclick="changePage(${i})" class="px-3 py-1 text-sm ${i === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-lg">${i}</button>`;
-        }
-        
-        if (page < totalPages) {
-            html += `<button onclick="changePage(${page + 1})" class="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Next</button>`;
-        }
-        
-        pagination.innerHTML = html;
+        html += `<button onclick="changePage(${page+1})" ${page>=totalPages?'disabled class="opacity-40 cursor-not-allowed px-3 py-1.5 rounded-lg border border-slate-200 text-sm":"class=\"px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50\""}>Next →</button>`;
+        box.innerHTML = html;
     }
 
-    function changePage(page) {
-        currentPage = page;
-        loadLogs();
-    }
+    function changePage(p){ currentPage = p; loadLogs(); }
 
-    document.getElementById('status-filter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
-    });
+    document.getElementById('status-filter').addEventListener('change', ()=>{ currentPage=1; loadLogs(); });
+    document.getElementById('device-filter').addEventListener('change', ()=>{ currentPage=1; loadLogs(); });
 
-    document.getElementById('device-filter').addEventListener('change', () => {
-        currentPage = 1;
-        loadLogs();
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!localStorage.getItem('admin_api_key')) {
-            const key = prompt('Enter your admin API key:');
-            if (key) localStorage.setItem('admin_api_key', key);
-        }
-        loadLogs();
-    });
+    async function refresh(){ await Promise.all([loadDeviceFilter(), loadLogs()]); }
+    document.addEventListener('DOMContentLoaded', () => { if(!getKey()) showAuth(); else refresh(); });
 </script>
 {% endblock %}

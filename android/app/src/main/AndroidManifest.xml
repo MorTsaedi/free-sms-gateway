@@ -48,6 +48,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- SMS sent/delivery status receivers. Registered in the manifest so they can
+             receive broadcasts even when SmsService is killed by the OS. -->
+        <receiver
+            android:name=".SmsStatusReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="SMS_SENT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="SMS_DELIVERED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

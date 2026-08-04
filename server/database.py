@@ -21,6 +21,7 @@ class DeviceStatus(str, enum.Enum):
 
 class SMSStatus(str, enum.Enum):
     PENDING = "pending"
+    CLAIMED = "claimed"  # Claimed by device, awaiting send result
     SENT = "sent"
     FAILED = "failed"
     DELIVERED = "delivered"

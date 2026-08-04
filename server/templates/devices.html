@@ -1,160 +1,162 @@
 {% extends "base.html" %}
 
-{% block title %}Devices - SMS Gateway{% endblock %}
+{% block title %}Devices — Relay{% endblock %}
 
 {% block content %}
-<div class="mb-8 flex justify-between items-center">
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
     <div>
-        <h2 class="text-2xl font-bold text-gray-900">Devices</h2>
-        <p class="text-gray-600 mt-1">Manage registered devices</p>
+        <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 mb-1">Fleet</p>
+        <h1 class="font-display text-2xl sm:text-3xl font-semibold text-slate-900">Devices</h1>
+        <p class="text-sm text-slate-500 mt-1">The Android relays that deliver your messages.</p>
     </div>
-    <button onclick="openCreateModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-        Add Device
+    <button onclick="openCreate()" class="inline-flex items-center justify-center gap-2 bg-[#0b1320] hover:bg-black text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add device
     </button>
 </div>
 
-<div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200" id="devices-table">
-            <tr>
-                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading...</td>
-            </tr>
-        </tbody>
-    </table>
+<!-- Fleet summary chips -->
+<div class="flex flex-wrap gap-2 mb-6" id="fleet-summary">
+    <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-medium text-slate-600"><span class="w-2 h-2 rounded-full bg-slate-300"></span><span id="chip-total">–</span> registered</span>
+    <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-medium text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span id="chip-online">–</span> online</span>
+    <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-medium text-slate-600"><span class="w-2 h-2 rounded-full bg-red-400"></span><span id="chip-offline">–</span> offline</span>
 </div>
 
-<div id="create-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Create Device</h3>
+<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100">
+            <thead>
+                <tr class="text-left text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                    <th class="px-5 py-3">Device</th>
+                    <th class="px-5 py-3">Status</th>
+                    <th class="px-5 py-3">Last seen</th>
+                    <th class="px-5 py-3">Registered</th>
+                    <th class="px-5 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="devices-table" class="divide-y divide-slate-100">
+                <tr><td colspan="5" class="px-5 py-10 text-center text-slate-400">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create modal -->
+<div id="create-modal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-[#0b1320]/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7">
+        <h3 class="font-display text-lg font-semibold text-slate-900">Add a device</h3>
+        <p class="text-sm text-slate-500 mt-1">Name the phone that will relay your messages.</p>
+        <label class="block text-sm font-medium text-slate-700 mt-5 mb-1.5">Device name</label>
+        <input id="device-name" type="text" placeholder="e.g. Nexus relay 01" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10">
+        <div class="flex justify-end gap-2 mt-6">
+            <button onclick="closeCreate()" class="px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition">Cancel</button>
+            <button onclick="createDevice()" class="px-4 py-2.5 text-sm font-medium text-white bg-[#0b1320] hover:bg-black rounded-xl transition">Create device</button>
         </div>
-        <div class="px-6 py-4">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
-                <input type="text" id="device-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. My Phone">
-            </div>
+    </div>
+</div>
+
+<!-- API key reveal modal -->
+<div id="key-modal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-[#0b1320]/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7">
+        <div class="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m3 3L21 8m-3 3L14.5 7.5"/></svg>
         </div>
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-            <button onclick="closeCreateModal()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-            <button onclick="createDevice()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create</button>
+        <h3 class="font-display text-lg font-semibold text-slate-900">Device key created</h3>
+        <p class="text-sm text-slate-500 mt-1">Copy this into the Relay app on the phone. <span class="font-medium text-amber-600">It won’t be shown again.</span></p>
+        <div class="mt-4 flex items-center gap-2">
+            <input id="key-value" type="text" readonly class="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-700 min-w-0">
+            <button onclick="copyKey()" class="shrink-0 px-3 py-2.5 rounded-xl bg-[#0b1320] text-white text-sm font-medium hover:bg-black transition">Copy</button>
         </div>
+        <button onclick="closeKey()" class="mt-5 w-full px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition">Done</button>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    async function loadDevices() {
-        try {
-            const response = await fetch('/api/v1/admin/devices', {
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            const tbody = document.getElementById('devices-table');
+    let lastKey = '';
 
-            if (!response.ok) {
-                if (response.status === 401) localStorage.removeItem('admin_api_key');
-                const err = await response.json().catch(() => ({}));
-                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Failed to load devices (${response.status}): ${err.detail || 'invalid/missing admin key - reload to re-enter'}</td></tr>`;
-                return;
-            }
-
-            const devices = await response.json();
-            if (devices.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No devices registered. Click "Add Device" to create one.</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = devices.map(d => `
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${d.name}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${d.status === 'online' ? 'bg-green-100 text-green-800' : d.status === 'offline' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
-                            ${d.status}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(d.created_at).toLocaleString()}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onclick="deleteDevice(${d.id})" class="text-red-600 hover:text-red-900 mr-3">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        } catch (e) {
-            console.error('Failed to load devices', e);
-        }
+    function statusBadge(st){
+        const hex = { online:'#22b57a', offline:'#e5484d', never_connected:'#94a3b8' }[st] || '#94a3b8';
+        const label = st === 'never_connected' ? 'never seen' : st;
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium" style="background:${hex}1a;color:${hex}">
+            <span class="w-1.5 h-1.5 rounded-full" style="background:${hex}"></span>${label}</span>`;
     }
 
-    async function createDevice() {
+    async function loadDevices(){
+        const tbody = document.getElementById('devices-table');
+        try{
+            const devices = await api('/api/v1/admin/devices');
+            if(!devices.length){
+                tbody.innerHTML = `<tr><td colspan="5" class="px-5 py-12 text-center">
+                    <div class="text-slate-400 text-sm mb-3">No devices yet — add your first relay phone.</div>
+                    <button onclick="openCreate()" class="inline-flex items-center gap-2 bg-[#0b1320] text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-black transition"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add device</button>
+                </td></tr>`;
+                return;
+            }
+            tbody.innerHTML = devices.map(d=>`
+                <tr class="hover:bg-slate-50/60 transition">
+                    <td class="px-5 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-semibold ${d.status==='online'?'bg-emerald-50 text-emerald-600':'bg-slate-100 text-slate-400'}">${esc(d.name[0].toUpperCase())}</div>
+                            <div><div class="font-medium text-slate-800">${esc(d.name)}</div><div class="font-mono text-[11px] text-slate-400">#${d.id}</div></div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-3.5">${statusBadge(d.status)}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500">${d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500">${new Date(d.created_at).toLocaleDateString()}</td>
+                    <td class="px-5 py-3.5 text-right">
+                        <button onclick="openDelete(${d.id}, '${esc(d.name)}')" class="text-slate-400 hover:text-red-600 transition" title="Delete device">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
+                    </td>
+                </tr>`).join('');
+        }catch(e){ if(e.status!==401){ tbody.innerHTML = `<tr><td colspan="5" class="px-5 py-10 text-center text-red-500 text-sm">Couldn’t load devices: ${esc(e.message)}</td></tr>`; } }
+    }
+
+    async function loadSummary(){
+        try{
+            const d = await api('/api/v1/admin/stats');
+            document.getElementById('chip-total').textContent = d.devices.total;
+            document.getElementById('chip-online').textContent = d.devices.online;
+            document.getElementById('chip-offline').textContent = d.devices.offline;
+        }catch(e){}
+    }
+
+    function openCreate(){ document.getElementById('device-name').value=''; const m=document.getElementById('create-modal'); m.classList.remove('hidden'); m.classList.add('flex'); setTimeout(()=>document.getElementById('device-name').focus(),60); }
+    function closeCreate(){ document.getElementById('create-modal').classList.add('hidden'); document.getElementById('create-modal').classList.remove('flex'); }
+
+    async function createDevice(){
         const name = document.getElementById('device-name').value.trim();
-        if (!name) return alert('Please enter a device name');
-        
-        try {
-            const response = await fetch('/api/v1/admin/devices', {
-                method: 'POST',
-                headers: { 
-                    'X-API-Key': localStorage.getItem('admin_api_key'),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name })
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                alert(`Device created! API Key: ${data.api_key}\n\nSave this key - it won't be shown again.`);
-                closeCreateModal();
-                loadDevices();
-            } else {
-                const err = await response.json();
-                alert('Error: ' + err.detail);
-            }
-        } catch (e) {
-            console.error('Failed to create device', e);
-            alert('Failed to create device');
-        }
+        if(!name){ toast('Enter a device name', 'error'); return; }
+        try{
+            const data = await api('/api/v1/admin/devices', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+            closeCreate(); toast('Device created', 'success');
+            lastKey = data.api_key || '';
+            document.getElementById('key-value').value = '';
+            document.getElementById('create-modal').classList.add('hidden');
+            const km = document.getElementById('key-modal');
+            km.classList.remove('hidden'); km.classList.add('flex');
+            if(lastKey) document.getElementById('key-value').value = lastKey;
+            else document.getElementById('key-value').placeholder = 'Key unavailable';
+            loadDevices(); loadSummary();
+        }catch(e){ toast('Error: '+e.message, 'error'); }
     }
 
-    async function deleteDevice(id) {
-        if (!confirm('Delete this device? This cannot be undone.')) return;
-        
-        try {
-            const response = await fetch(`/api/v1/admin/devices/${id}`, {
-                method: 'DELETE',
-                headers: { 'X-API-Key': localStorage.getItem('admin_api_key') }
-            });
-            if (response.ok) {
-                loadDevices();
-            }
-        } catch (e) {
-            console.error('Failed to delete device', e);
-        }
+    function closeKey(){ document.getElementById('key-modal').classList.add('hidden'); document.getElementById('key-modal').classList.remove('flex'); }
+    async function copyKey(){
+        const v = document.getElementById('key-value').value;
+        if(!v) return;
+        try{ await navigator.clipboard.writeText(v); toast('Key copied', 'success'); }
+        catch(e){ document.getElementById('key-value').select(); document.execCommand('copy'); toast('Key copied', 'success'); }
     }
 
-    function openCreateModal() {
-        document.getElementById('device-name').value = '';
-        document.getElementById('create-modal').classList.remove('hidden');
-        document.getElementById('create-modal').classList.add('flex');
+    function openDelete(id, name){
+        if(!confirm(`Delete “${name}”? This removes the device and its SMS history.`)) return;
+        api('/api/v1/admin/devices/'+id, {method:'DELETE'}).then(()=>{ toast('Device deleted', 'success'); loadDevices(); loadSummary(); }).catch(e=>toast(e.message,'error'));
     }
 
-    function closeCreateModal() {
-        document.getElementById('create-modal').classList.add('hidden');
-        document.getElementById('create-modal').classList.remove('flex');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!localStorage.getItem('admin_api_key')) {
-            const key = prompt('Enter your admin API key:');
-            if (key) localStorage.setItem('admin_api_key', key);
-        }
-        loadDevices();
-    });
+    async function refresh(){ await Promise.all([loadDevices(), loadSummary()]); }
+    document.addEventListener('DOMContentLoaded', () => { if(!getKey()) showAuth(); else refresh(); });
 </script>
 {% endblock %}

@@ -60,8 +60,9 @@ This is the tool I always wished existed. Now it does.
 2. **Admin** triggers an APK build with that API key → APK is compiled on the VM
 3. **User** installs the APK on their phone → app registers with VM using its key
 4. **Admin** queues SMS via admin UI → message sits in SQLite queue
-5. **Phone** polls VM every 15s (configurable) → receives pending SMS → sends via `SmsManager` → reports result
-6. **Admin** sees delivery status in the logs
+5. **Phone** polls VM every 15s (configurable) → claims pending SMS → sends via `SmsManager` → reports result
+6. **Phone** reports delivery confirmation (if the carrier supports it) → status becomes `delivered`
+7. **Admin** sees delivery status in the logs
 
 ### Key Design Decisions
 
@@ -71,8 +72,9 @@ This is the tool I always wished existed. Now it does.
 | **VM builds APK** | App gets correct config baked in; user doesn't need to enter sensitive keys manually |
 | **APK is debug-signed** | No Play Store required; direct install; no build complexity |
 | **Foreground service** | Android 13+ requires foreground service for background SMS sending |
-| **WorkManager backup** | If foreground service is killed, WorkManager still retries polling |
-| **SQLite on VM** | No external DB required; everything containerized with Docker Compose |
+| **WorkManager backup** | If foreground service is killed, WorkManager claims **and sends** SMS — a message is never left stuck in `claimed` |
+| **At-most-once delivery** | The poll query atomically claims SMS, and stale claims (crashed phones) are released after 5 minutes so a message is never sent twice or lost |
+| **SQLite on VM** | No external DB required; runs on any VPS with just Python + a web server |
 | **bCrypt hashed API keys** | Keys never stored in plaintext; compromised DB won't leak usable keys |
 
 ---
@@ -82,7 +84,7 @@ This is the tool I always wished existed. Now it does.
 - **VM Server (FastAPI)**
   - Device registration with auto-generated API keys
   - HTTP polling endpoint for SMS delivery
-  - SMS queue with status tracking (pending → sent → delivered/failed)
+  - SMS queue with status tracking (pending → claimed → sent → delivered/failed)
   - Admin API + web UI (HTMX + Tailwind, no JS framework needed)
   - On-demand APK building with config injection
   - One-time download tokens (1-hour expiry) for APK downloads
@@ -106,6 +108,7 @@ This is the tool I always wished existed. Now it does.
 
 - **Deployment**
   - Single `docker compose up` command
+  - **Native install** (no Docker) — plain Python + uvicorn behind nginx, no Android SDK needed on the server unless you build APKs on-machine
   - Automatic HTTPS with Let's Encrypt (certbot)
   - Nginx reverse proxy with static file serving
   - Health checks for container orchestration
@@ -153,6 +156,102 @@ Navigate to `https://your-domain.com/admin` in your browser.
 
 ---
 
+## Run Without Docker (Native Install)
+
+No Docker required. The gateway is just a FastAPI app; it runs on any Linux VPS with Python 3.10+. The Android SDK is only needed if you want the server to build APKs for you — for plain operation you can skip it entirely and build APKs elsewhere.
+
+### 1. Install the app
+
+```bash
+git clone https://github.com/MorTsaedi/free-sms-gateway.git
+cd free-sms-gateway
+
+# Create a venv and install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env — set API_KEY, SECRET_KEY, VM_PUBLIC_URL
+#   API_KEY:     admin key for the web UI
+#   SECRET_KEY:  any random string
+#   VM_PUBLIC_URL: your server's public URL (used for APK download links)
+```
+
+### 3. Start the server
+
+```bash
+uvicorn server.main:app --host 0.0.0.0 --port 8000
+```
+
+Open `http://your-server:8000/admin` and enter the admin key from `.env`.
+
+### 4. Run as a systemd service (recommended)
+
+Create `/etc/systemd/system/sms-gateway.service`:
+
+```ini
+[Unit]
+Description=Free SMS Gateway (FastAPI + uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/free-sms-gateway
+EnvironmentFile=/root/free-sms-gateway/.env
+ExecStart=/root/free-sms-gateway/.venv/bin/uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now sms-gateway
+sudo systemctl status sms-gateway
+```
+
+### 5. Put nginx in front (for HTTPS + static files)
+
+```nginx
+# /etc/nginx/sites-available/sms-gateway
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+Add HTTPS with `sudo certbot --nginx -d your-domain.com`, then update `VM_PUBLIC_URL` in `.env` to `https://your-domain.com` and restart the service.
+
+> **Static files note:** if the nginx `www-data` user can't read the `static/downloads/` directory under a restricted home folder, proxy `/static/` to FastAPI in the nginx config instead of serving it from disk.
+
+### 6. (Optional) On-machine APK builds
+
+To let the server compile APKs you need **JDK 17** and the **Android SDK**. See the Dockerfile or [Android section](#building-apk-locally) for the toolchain, then adjust `server/services/apk_builder.py` paths if your SDK lives elsewhere. Without the SDK, build the APK on any machine with Android Studio and either upload it to `static/downloads/` or point `build_config.yaml` at it.
+
+### Native vs. Docker — what's the difference?
+
+| | Docker | Native |
+|---|---|---|
+| Dependencies | Docker + Compose | Python 3.10+ (everything else via pip) |
+| APK builds on server | Included (SDK in image, ~2GB) | Optional — needs JDK 17 + Android SDK |
+| Memory at idle | ~50–100MB in container | ~50MB (just the Python process) |
+| Best for | One-shot reproducible deploy | Cheap/low-RAM VPS, easy to edit & debug |
+
+---
+
 ## Project Structure
 
 ```
@@ -185,6 +284,9 @@ free-sms-gateway/
 │   │   │   ├── java/com/smsgateway/
 │   │   │   │   ├── MainActivity.kt
 │   │   │   │   ├── SmsService.kt
+│   │   │   │   ├── SmsStatusReceiver.kt   # SMS sent/delivery status (manifest-registered)
+│   │   │   │   ├── SmsResultSender.kt     # Reports send result (works if service is killed)
+│   │   │   │   ├── DeliveryReporter.kt    # Reports delivery status (works if service is killed)
 │   │   │   │   ├── PollingWorker.kt
 │   │   │   │   ├── ApiClient.kt
 │   │   │   │   ├── BootReceiver.kt
@@ -206,9 +308,10 @@ free-sms-gateway/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/v1/device/register` | Register a new device |
-| `GET` | `/api/v1/device/poll` | Poll for pending SMS |
+| `GET` | `/api/v1/device/poll` | Poll for & claim pending SMS |
 | `POST` | `/api/v1/device/heartbeat` | Update device status |
 | `POST` | `/api/v1/device/sms/{id}/result` | Report SMS send result |
+| `POST` | `/api/v1/device/sms/{id}/delivery` | Report SMS delivery status |
 
 ### SMS Endpoints (Admin API Key)
 
@@ -317,16 +420,22 @@ cd android
 - Python backend uses **FastAPI** async with SQLAlchemy 2.0
 - API auth uses **API key headers** (`X-API-Key` for admin, `X-Device-API-Key` for devices)
 - Android app uses **Kotlin** with **WorkManager** + **Foreground Service**
-- Admin UI uses **Jinja2** + **HTMX** (no React/Vue/Angular)
+- Admin UI uses **Jinja2** + **Tailwind CSS** + vanilla JS (no React/Vue/Angular)
 
 ---
 
 ## Troubleshooting
 
-### APK build fails in Docker
-- Check logs: `docker compose logs app`
+### APK build fails
+- Docker: check logs with `docker compose logs app`
+- Native: run the build from the server log: `journalctl -u sms-gateway -f` or start uvicorn in the foreground
 - The Android SDK install can take 5+ minutes on first run
 - Ensure your machine has enough disk space (Android SDK + Gradle cache ~2GB)
+
+### SMS stuck in "claimed" status
+- A message is `claimed` when a phone polls for it but hasn't reported a result yet
+- The poll endpoint **releases stale claims after 5 minutes**, so a crashed/killed phone's message becomes available to any online device again — check that at least one device is online
+- If the phone app was updated, confirm the new APK is installed (old builds that only polled — without sending — could claim without reporting)
 
 ### Phone not receiving SMS
 - Check device status in admin UI — should show "online"
@@ -336,8 +445,9 @@ cd android
 
 ### Nginx SSL issues
 - First-time Let's Encrypt setup takes a few minutes
-- Check certificate status: `docker compose run certbot certificates`
-- For local testing, temporarily comment out the SSL redirect in `nginx.conf`
+- Docker: check certificate status with `docker compose run certbot certificates`
+- Native: check with `sudo certbot certificates`, then `sudo systemctl reload nginx`
+- For local testing, temporarily comment out the SSL redirect in the server block
 
 ### Container Resource Usage
 
