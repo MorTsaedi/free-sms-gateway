@@ -110,16 +110,33 @@
         }catch(e){}
     }
 
+    function pageButton(label, target, disabled){
+        // Build the class list with string concatenation — the previous version escaped
+        // nested double-quotes inside a ${...} ternary, which threw a JS SyntaxError and
+        // left the Activity page stuck on "Loading…".
+        const cls = ['px-3','py-1.5','rounded-lg','text-sm'];
+        if(disabled){
+            cls.push('opacity-40','cursor-not-allowed','border','border-slate-200');
+        } else {
+            cls.push('border','border-slate-200','hover:bg-slate-50');
+        }
+        const attr = disabled ? 'disabled ' : '';
+        return '<button ' + attr + 'onclick="changePage(' + target + ')" class="' + cls.join(' ') + '">' + label + '</button>';
+    }
+
     function renderPagination(total, page, ps){
         const totalPages = Math.ceil(total/ps);
         const box = document.getElementById('pagination');
         if(totalPages <= 1){ box.innerHTML = ''; return; }
         let html = '';
-        html += `<button onclick="changePage(${page-1})" ${page<=1?'disabled class="opacity-40 cursor-not-allowed px-3 py-1.5 rounded-lg border border-slate-200 text-sm":"class=\"px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50\""}>← Prev</button>`;
+        html += pageButton('← Prev', page-1, page<=1);
         for(let i=Math.max(1,page-2); i<=Math.min(totalPages,page+2); i++){
-            html += `<button onclick="changePage(${i})" class="px-3 py-1.5 rounded-lg text-sm ${i===page?'bg-[#0b1320] text-white':'border border-slate-200 hover:bg-slate-50'}">${i}</button>`;
+            const active = i===page;
+            html += '<button onclick="changePage(' + i + ')" class="px-3 py-1.5 rounded-lg text-sm ' +
+                (active ? 'bg-[#0b1320] text-white' : 'border border-slate-200 hover:bg-slate-50') +
+                '">' + i + '</button>';
         }
-        html += `<button onclick="changePage(${page+1})" ${page>=totalPages?'disabled class="opacity-40 cursor-not-allowed px-3 py-1.5 rounded-lg border border-slate-200 text-sm":"class=\"px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50\""}>Next →</button>`;
+        html += pageButton('Next →', page+1, page>=totalPages);
         box.innerHTML = html;
     }
 

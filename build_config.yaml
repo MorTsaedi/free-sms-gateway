@@ -6,5 +6,5 @@ app:
 build:
   keystore: debug
 vm:
-  api_key: "auto-generated-key"
+  api_key: QRaYoWrzvV5CKKRrcP6IiDC_YTwDiBfYJmtbf06CoOg
   url: http://185.214.101.206

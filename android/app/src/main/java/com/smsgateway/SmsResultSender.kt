@@ -22,6 +22,25 @@ object SmsResultSender {
         .build()
     private val gson = Gson()
 
+    /**
+     * Returns true the first time it is called for a given [smsId], false afterwards.
+     *
+     * A message longer than 160 chars is split into multiple parts, and each part fires
+     * its own SMS_SENT broadcast carrying the same sms_id. It is also possible for both
+     * SmsService's dynamic receiver and the manifest-registered SmsStatusReceiver to fire
+     * for the same part. We only want one result reported to the server per SMS, so every
+     * report site funnels through this guard. Backed by SharedPreferences so the flag
+     * survives process death and is shared across receivers.
+     */
+    @Synchronized
+    fun firstReport(context: Context, smsId: Int): Boolean {
+        val prefs = context.getSharedPreferences("sms_gateway", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("reported_$smsId", false)) return false
+        // commit() (not apply()) so a second broadcast arriving in the same tick sees the flag.
+        prefs.edit().putBoolean("reported_$smsId", true).commit()
+        return true
+    }
+
     fun sendResult(context: Context, apiKey: String, smsId: Int, success: Boolean, error: String?) {
         Thread {
             try {

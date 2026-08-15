@@ -38,7 +38,10 @@ class SmsService : Service() {
             when (resultCode) {
                 android.app.Activity.RESULT_OK -> {
                     Log.i(TAG, "SMS sent confirmation received for id $smsId")
-                    SmsResultSender.sendResult(context!!, apiKey, smsId, true, null)
+                    // Report once: a multi-part SMS fires this receiver once per part.
+                    if (SmsResultSender.firstReport(context!!, smsId)) {
+                        SmsResultSender.sendResult(context, apiKey, smsId, true, null)
+                    }
                 }
                 else -> {
                     val error = when (resultCode) {
@@ -49,7 +52,9 @@ class SmsService : Service() {
                         else -> "Unknown error"
                     }
                     Log.e(TAG, "SMS sent failed for id $smsId: $error")
-                    SmsResultSender.sendResult(context!!, apiKey, smsId, false, error)
+                    if (SmsResultSender.firstReport(context!!, smsId)) {
+                        SmsResultSender.sendResult(context, apiKey, smsId, false, error)
+                    }
                 }
             }
             // Clean up pending intents
@@ -111,42 +116,57 @@ class SmsService : Service() {
 
         // Create PendingIntents for sent and delivery reports with API key embedded
         val apiKey = apiClient.apiKey
-        val sentIntent = Intent("SMS_SENT").apply {
-            putExtra("sms_id", sms.id)
-            putExtra("api_key", apiKey as java.io.Serializable)
-            setPackage(packageName)
+        val smsManager = SmsManager.getDefault()
+
+        // Split long messages into parts (160-char single-SMS limit) so SMS longer than
+        // one part send reliably on all devices. divideMessage returns a single-element
+        // list for short messages, so this also covers the normal single-part path.
+        val parts = smsManager.divideMessage(sms.message)
+
+        val sentPendingIntents = parts.indices.mapTo(ArrayList(parts.size)) { i ->
+            PendingIntent.getBroadcast(
+                this, sms.id * 10 + i,
+                Intent("SMS_SENT").apply {
+                    putExtra("sms_id", sms.id)
+                    putExtra("part_index", i)
+                    putExtra("part_count", parts.size)
+                    putExtra("api_key", apiKey as java.io.Serializable)
+                    setPackage(packageName)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
-        val deliveredIntent = Intent("SMS_DELIVERED").apply {
-            putExtra("sms_id", sms.id)
-            putExtra("api_key", apiKey as java.io.Serializable)
-            setPackage(packageName)
+        val deliveredPendingIntents = parts.indices.mapTo(ArrayList(parts.size)) { i ->
+            PendingIntent.getBroadcast(
+                this, sms.id * 10 + i,
+                Intent("SMS_DELIVERED").apply {
+                    putExtra("sms_id", sms.id)
+                    putExtra("part_index", i)
+                    putExtra("part_count", parts.size)
+                    putExtra("api_key", apiKey as java.io.Serializable)
+                    setPackage(packageName)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
-        val sentPendingIntent = PendingIntent.getBroadcast(
-            this, sms.id, sentIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val deliveredPendingIntent = PendingIntent.getBroadcast(
-            this, sms.id, deliveredIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        sentIntents[sms.id] = sentPendingIntent
-        deliveredIntents[sms.id] = deliveredPendingIntent
+        sentIntents[sms.id] = sentPendingIntents[0]
+        deliveredIntents[sms.id] = deliveredPendingIntents[0]
 
         try {
-            val smsManager = SmsManager.getDefault()
-
-            smsManager.sendTextMessage(
-                sms.to_number,
-                null,
-                sms.message,
-                sentPendingIntent,
-                deliveredPendingIntent
-            )
+            if (parts.size == 1) {
+                smsManager.sendTextMessage(
+                    sms.to_number, null, parts[0], sentPendingIntents[0], deliveredPendingIntents[0]
+                )
+            } else {
+                @Suppress("DEPRECATION") // sendMultipartTextMessage still required below API 33
+                smsManager.sendMultipartTextMessage(
+                    sms.to_number, null, parts, sentPendingIntents, deliveredPendingIntents
+                )
+            }
 
             // Result will be reported via broadcast receivers
-            Log.i(TAG, "SMS send initiated to ${sms.to_number} (id=${sms.id})")
+            Log.i(TAG, "SMS send initiated to ${sms.to_number} (id=${sms.id}, parts=${parts.size})")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send SMS to ${sms.to_number}", e)

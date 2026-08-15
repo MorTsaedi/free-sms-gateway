@@ -24,6 +24,10 @@ class SmsStatusReceiver : BroadcastReceiver() {
 
         when (intent.action) {
             "SMS_SENT" -> {
+                // Report only once per sms_id: a multi-part SMS fires this receiver once per
+                // part, and it may also fire alongside SmsService's dynamically-registered
+                // receiver for the same SMS.
+                if (!SmsResultSender.firstReport(context, smsId)) return
                 when (resultCode) {
                     android.app.Activity.RESULT_OK -> {
                         Log.i("SmsStatusReceiver", "SMS sent id=$smsId")

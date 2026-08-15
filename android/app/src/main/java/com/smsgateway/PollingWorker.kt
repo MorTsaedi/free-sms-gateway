@@ -46,29 +46,50 @@ class PollingWorker(
     private fun sendSms(sms: SmsItem, apiKey: String) {
         try {
             val smsManager = SmsManager.getDefault()
-            val sentIntent = android.app.PendingIntent.getBroadcast(
-                applicationContext, sms.id,
-                android.content.Intent("SMS_SENT").apply {
-                    putExtra("sms_id", sms.id)
-                    putExtra("api_key", apiKey)
-                    setPackage(applicationContext.packageName)
-                },
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
-            val deliveredIntent = android.app.PendingIntent.getBroadcast(
-                applicationContext, sms.id,
-                android.content.Intent("SMS_DELIVERED").apply {
-                    putExtra("sms_id", sms.id)
-                    putExtra("api_key", apiKey)
-                    setPackage(applicationContext.packageName)
-                },
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
 
-            smsManager.sendTextMessage(
-                sms.to_number, null, sms.message, sentIntent, deliveredIntent
-            )
-            Log.i("PollingWorker", "SMS send initiated to ${sms.to_number} (id=${sms.id})")
+            // Split long messages into parts (160-char single-SMS limit) so SMS longer than
+            // one part send reliably. divideMessage returns a single-element list for short
+            // messages, so this covers the normal path too.
+            val parts = smsManager.divideMessage(sms.message)
+
+            val sentPendingIntents = parts.indices.mapTo(ArrayList(parts.size)) { i ->
+                android.app.PendingIntent.getBroadcast(
+                    applicationContext, sms.id * 10 + i,
+                    android.content.Intent("SMS_SENT").apply {
+                        putExtra("sms_id", sms.id)
+                        putExtra("part_index", i)
+                        putExtra("part_count", parts.size)
+                        putExtra("api_key", apiKey)
+                        setPackage(applicationContext.packageName)
+                    },
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            val deliveredPendingIntents = parts.indices.mapTo(ArrayList(parts.size)) { i ->
+                android.app.PendingIntent.getBroadcast(
+                    applicationContext, sms.id * 10 + i,
+                    android.content.Intent("SMS_DELIVERED").apply {
+                        putExtra("sms_id", sms.id)
+                        putExtra("part_index", i)
+                        putExtra("part_count", parts.size)
+                        putExtra("api_key", apiKey)
+                        setPackage(applicationContext.packageName)
+                    },
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+
+            if (parts.size == 1) {
+                smsManager.sendTextMessage(
+                    sms.to_number, null, parts[0], sentPendingIntents[0], deliveredPendingIntents[0]
+                )
+            } else {
+                @Suppress("DEPRECATION") // sendMultipartTextMessage still required below API 33
+                smsManager.sendMultipartTextMessage(
+                    sms.to_number, null, parts, sentPendingIntents, deliveredPendingIntents
+                )
+            }
+            Log.i("PollingWorker", "SMS send initiated to ${sms.to_number} (id=${sms.id}, parts=${parts.size})")
         } catch (e: Exception) {
             Log.e("PollingWorker", "Failed to send SMS to ${sms.to_number}", e)
             // Report failure back to the server so it doesn't stay claimed forever
