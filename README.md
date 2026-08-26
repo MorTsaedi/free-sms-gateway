@@ -11,6 +11,8 @@
 
 > **Never pay Twilio, Plivo, or any SMS API again.** Run your own SMS gateway on a $5/month VPS and pay only for the SMS charges on your existing mobile plan.
 
+![dashboard](https://i.ibb.co/f7vZn1d/Screenshot-2026-08-27-at-01-26-32.png)
+
 ---
 
 ## Why I Made This
